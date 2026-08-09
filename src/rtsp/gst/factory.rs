@@ -42,6 +42,10 @@ impl NeoMediaFactory {
         factory.set_suspend_mode(gstreamer_rtsp_server::RTSPSuspendMode::Reset);
         factory.set_launch("videotestsrc pattern=\"snow\" ! video/x-raw,width=896,height=512,framerate=25/1 ! textoverlay name=\"inittextoverlay\" text=\"Stream not Ready\" valignment=top halignment=left font-desc=\"Sans, 32\" ! jpegenc ! rtpjpegpay name=pay0");
         factory.set_transport_mode(RTSPTransportMode::PLAY);
+        // Increase the UDP socket buffer to 512 KB so large RTP frames
+        // (H.265 keyframes in particular) don't overflow the OS socket buffer
+        // and force clients to fall back to TCP.
+        factory.set_property("buffer-size", 0x80000u32);
         factory
     }
 
