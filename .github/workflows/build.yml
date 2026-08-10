@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  rust_version: "1.86.0"
+  rust_version: "stable"
 
 jobs:
   native:
@@ -29,12 +29,15 @@ jobs:
         name: Install Windows deps
         run: |
           # Gstreamer
-          choco install -y --no-progress gstreamer --version=1.24.2
-          choco install -y --no-progress gstreamer-devel --version=1.24.2
+          choco install -y --no-progress gstreamer
+          choco install -y --no-progress gstreamer-devel
           $gstreamerPaths = @(
             "$env:SYSTEMDRIVE\gstreamer\1.0\msvc_x86_64\",
+            "$env:SYSTEMDRIVE\tools\gstreamer\1.0\msvc_x86_64\",
             "C:\gstreamer\1.0\msvc_x86_64\",
-            "D:\gstreamer\1.0\msvc_x86_64\"
+            "C:\tools\gstreamer\1.0\msvc_x86_64\",
+            "D:\gstreamer\1.0\msvc_x86_64\",
+            "D:\tools\gstreamer\1.0\msvc_x86_64\"
           )
           $env:GSTREAMER_1_0_ROOT_MSVC_X86_64 = $gstreamerPaths | Where-Object { Test-Path -Path $_ -PathType Container } | Select-Object -First 1
           if (-not $env:GSTREAMER_1_0_ROOT_MSVC_X86_64) {
