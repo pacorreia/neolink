@@ -416,7 +416,7 @@ fn send_to_appsrc(
         Ok(_) => Ok(()),
         Err(FlowError::Flushing) => {
             // Buffer is full, skip this frame; the live-source path already handles drops
-            log::info!(
+            log::debug!(
                 "Buffer full on {} dropping frame",
                 appsrc.name()
             );
@@ -938,5 +938,6 @@ fn make_queue(name: &str, buffer_size: u32) -> AnyResult<Element> {
 
 fn buffer_size(bitrate: u32) -> u32 {
     // ~125ms worth of data at the configured bitrate, or 4 KB minimum
-    std::cmp::max(bitrate / 8u32, 4u32 * 1024u32)
+    // bitrate is in bits/sec: divide by 8 to get bytes/sec, then by 8 for 125ms (1/8 s)
+    std::cmp::max(bitrate / 64u32, 4u32 * 1024u32)
 }
