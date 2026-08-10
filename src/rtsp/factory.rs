@@ -182,7 +182,7 @@ pub(super) async fn make_factory(
                         while let Some(media) = media_rx.recv().await {
                             stream_config.update_from_media(&media);
                             buffer.push(media);
-                            if frame_count > 10
+                            if frame_count > 1
                                 || (stream_config.vid_type.is_some()
                                     && stream_config.aud_type.is_some())
                             {
@@ -413,36 +413,17 @@ fn send_to_appsrc(
 
     // Push buffer into the appsrc
     match appsrc.push_buffer(buf) {
-        Ok(_) => {
-            // log::info!(
-            //     "Send {}{} on {}",
-            //     data.data.len(),
-            //     if data.keyframe { " (keyframe)" } else { "" },
-            //     appsrc.name()
-            // );
-            Ok(())
-        }
+        Ok(_) => Ok(()),
         Err(FlowError::Flushing) => {
-            // Buffer is full just skip
-            log::info!(
-                "Buffer full on {} pausing stream until client consumes frames",
+            // Buffer is full, skip this frame; the live-source path already handles drops
+            log::debug!(
+                "Buffer full on {} dropping frame",
                 appsrc.name()
             );
             Ok(())
         }
         Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
-    }?;
-    // Check if we need to pause
-    if appsrc.current_level_bytes() >= appsrc.max_bytes() * 2 / 3
-        && matches!(appsrc.current_state(), gstreamer::State::Paused)
-    {
-        appsrc.set_state(gstreamer::State::Playing).unwrap();
-    } else if appsrc.current_level_bytes() <= appsrc.max_bytes() / 3
-        && matches!(appsrc.current_state(), gstreamer::State::Playing)
-    {
-        appsrc.set_state(gstreamer::State::Paused).unwrap();
     }
-    Ok(())
 }
 fn check_live(app: &AppSrc) -> Result<()> {
     app.bus().ok_or(anyhow!("App source is closed"))?;
@@ -520,12 +501,12 @@ fn pipe_h264(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
 
-    source.set_is_live(false);
+    source.set_is_live(true);
     source.set_block(false);
     source.set_min_latency(1000 / (stream_config.fps as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
-    source.set_do_timestamp(false);
+    source.set_do_timestamp(true);
     source.set_stream_type(AppStreamType::Stream);
 
     let source = source
@@ -556,6 +537,7 @@ fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
         .map_err(|_| anyhow!("Media source's element should be a bin"))?;
 
     let payload = make_element("rtph264pay", "pay0")?;
+    payload.set_property("mtu", 1400u32);
     bin.add_many([&payload])?;
     Element::link_many([&linked.output, &payload])?;
     Ok(linked.appsrc)
@@ -571,12 +553,12 @@ fn pipe_h265(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
     let source = make_element("appsrc", "vidsrc")?
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
-    source.set_is_live(false);
+    source.set_is_live(true);
     source.set_block(false);
     source.set_min_latency(1000 / (stream_config.fps as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
-    source.set_do_timestamp(false);
+    source.set_do_timestamp(true);
     source.set_stream_type(AppStreamType::Stream);
 
     let source = source
@@ -607,6 +589,7 @@ fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
         .map_err(|_| anyhow!("Media source's element should be a bin"))?;
 
     let payload = make_element("rtph265pay", "pay0")?;
+    payload.set_property("mtu", 1400u32);
     bin.add_many([&payload])?;
     Element::link_many([&linked.output, &payload])?;
     Ok(linked.appsrc)
@@ -624,12 +607,12 @@ fn pipe_aac(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
 
-    source.set_is_live(false);
+    source.set_is_live(true);
     source.set_block(false);
     source.set_min_latency(1000 / (stream_config.fps as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
-    source.set_do_timestamp(false);
+    source.set_do_timestamp(true);
     source.set_stream_type(AppStreamType::Stream);
 
     let source = source
@@ -710,12 +693,12 @@ fn pipe_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> R
     let source = make_element("appsrc", "audsrc")?
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
-    source.set_is_live(false);
+    source.set_is_live(true);
     source.set_block(false);
     source.set_min_latency(1000 / (stream_config.fps as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
-    source.set_do_timestamp(false);
+    source.set_do_timestamp(true);
     source.set_stream_type(AppStreamType::Stream);
 
     source.set_caps(Some(
@@ -782,12 +765,12 @@ fn pipe_silence(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
 
-    source.set_is_live(false);
+    source.set_is_live(true);
     source.set_block(false);
     source.set_min_latency(1000 / (stream_config.fps as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
-    source.set_do_timestamp(false);
+    source.set_do_timestamp(true);
     source.set_stream_type(AppStreamType::Stream);
 
     let source = source
@@ -948,16 +931,13 @@ fn make_queue(name: &str, buffer_size: u32) -> AnyResult<Element> {
     let queue = make_element("queue", &format!("queue1_{}", name))?;
     queue.set_property("max-size-bytes", buffer_size);
     queue.set_property("max-size-buffers", 0u32);
+    // No time-based limit; rely solely on max-size-bytes to avoid introducing latency
     queue.set_property("max-size-time", 0u64);
-    queue.set_property(
-        "max-size-time",
-        std::convert::TryInto::<u64>::try_into(tokio::time::Duration::from_secs(5).as_nanos())
-            .unwrap_or(0),
-    );
     Ok(queue)
 }
 
 fn buffer_size(bitrate: u32) -> u32 {
-    // 0.1 seconds (according to bitrate) or 4kb what ever is larger
-    std::cmp::max(bitrate * 2 / 8u32, 4u32 * 1024u32)
+    // ~125ms worth of data at the configured bitrate, or 4 KB minimum
+    // bitrate is in bits/sec: divide by 8 to get bytes/sec, then by 8 for 125ms (1/8 s)
+    std::cmp::max(bitrate / 64u32, 4u32 * 1024u32)
 }
