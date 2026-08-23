@@ -28,9 +28,15 @@ jobs:
       - if: runner.os == 'Windows'
         name: Install Windows deps
         run: |
-          # Gstreamer
-          choco install -y --no-progress gstreamer
-          choco install -y --no-progress gstreamer-devel
+          # Gstreamer - download directly from official site to avoid Chocolatey version/hash issues
+          $gstVersion = "1.24.11"
+          $gstBase = "https://gstreamer.freedesktop.org/data/pkg/windows/$gstVersion/msvc"
+          $gstRuntime = "$gstBase/gstreamer-1.0-msvc-x86_64-$gstVersion.msi"
+          $gstDevel = "$gstBase/gstreamer-1.0-devel-msvc-x86_64-$gstVersion.msi"
+          Invoke-WebRequest -Uri $gstRuntime -OutFile "$env:TEMP\gstreamer.msi"
+          Start-Process msiexec.exe -ArgumentList "/i `"$env:TEMP\gstreamer.msi`" /quiet /norestart ADDLOCAL=ALL" -Wait -NoNewWindow
+          Invoke-WebRequest -Uri $gstDevel -OutFile "$env:TEMP\gstreamer-devel.msi"
+          Start-Process msiexec.exe -ArgumentList "/i `"$env:TEMP\gstreamer-devel.msi`" /quiet /norestart ADDLOCAL=ALL" -Wait -NoNewWindow
           $gstreamerPaths = @(
             "$env:SYSTEMDRIVE\gstreamer\1.0\msvc_x86_64\",
             "$env:SYSTEMDRIVE\tools\gstreamer\1.0\msvc_x86_64\",
