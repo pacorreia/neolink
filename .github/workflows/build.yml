@@ -28,9 +28,9 @@ jobs:
       - if: runner.os == 'Windows'
         name: Install Windows deps
         run: |
-          # Gstreamer - pin both runtime and devel to the same version to avoid version mismatch
-          choco install -y --no-progress gstreamer --version=1.24.11
-          choco install -y --no-progress gstreamer-devel --version=1.24.11
+          # Gstreamer - install devel only (it pulls in matching gstreamer runtime as a dependency).
+          # Use --ignore-checksums because the chocolatey package metadata has a stale hash for the MSI.
+          choco install -y --no-progress --ignore-checksums gstreamer-devel
           $gstreamerPaths = @(
             "$env:SYSTEMDRIVE\gstreamer\1.0\msvc_x86_64\",
             "$env:SYSTEMDRIVE\tools\gstreamer\1.0\msvc_x86_64\",
