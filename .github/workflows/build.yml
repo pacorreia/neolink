@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-2022, macos-13, macos-14] # macos-14+ is arm64
+        os: [ubuntu-22.04, windows-2022, macos-15-intel, macos-14] # macos-14+ is arm64; macos-15-intel for x86_64
     steps:
       - uses: actions/checkout@v7
         name: Checkout onto ${{ runner.os }}
@@ -75,11 +75,11 @@ jobs:
       - if: runner.os == 'macOS'
         name: Install macOS deps
         run: |
-          brew install pkg-config protobuf openssl@1.1 gstreamer gst-plugins-base
+          brew install pkg-config protobuf openssl@3 gstreamer gst-plugins-base
           PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig:$(brew --prefix gstreamer)/lib/pkgconfig:$(brew --prefix gst-plugins-base)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}" >> "${GITHUB_ENV}"
-          echo "OPENSSL_INCLUDE_DIR=$(brew --prefix openssl@1.1)/include/" >>  "${GITHUB_ENV}"
-          echo "OPENSSL_LIB_DIR=$(brew --prefix openssl@1.1)/lib/" >>  "${GITHUB_ENV}"
+          echo "OPENSSL_INCLUDE_DIR=$(brew --prefix openssl@3)/include/" >>  "${GITHUB_ENV}"
+          echo "OPENSSL_LIB_DIR=$(brew --prefix openssl@3)/lib/" >>  "${GITHUB_ENV}"
       - name: Cache cargo registry
         uses: actions/cache@v6
         with:
@@ -348,7 +348,7 @@ jobs:
       - name: Download Macos
         uses: actions/download-artifact@v8
         with:
-          name: release-macos-13
+          name: release-macos-15-intel
           path: neolink_macos_intel
       - name: Download Macos arm64
         uses: actions/download-artifact@v8
