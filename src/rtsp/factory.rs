@@ -416,10 +416,7 @@ fn send_to_appsrc(
         Ok(_) => Ok(()),
         Err(FlowError::Flushing) => {
             // Buffer is full, skip this frame; the live-source path already handles drops
-            log::debug!(
-                "Buffer full on {} dropping frame",
-                appsrc.name()
-            );
+            log::debug!("Buffer full on {} dropping frame", appsrc.name());
             Ok(())
         }
         Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
