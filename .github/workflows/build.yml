@@ -248,13 +248,13 @@ jobs:
           branch="$(git rev-parse --abbrev-ref HEAD)"
 
           if [[ -n "${gittag}" ]]; then
-            tags=( "${tags[@]}" "${REPO_NAME}:${gittag}" )
+            tags=( "${tags[@]}" "${REPO_NAME}:${gittag}" "${REPO_NAME}:latest" )
           fi
           if [[ -n "${branch}" ]]; then
             branch="$(echo "${branch}" | sed -E 's|[/]|-|g')"
             tags=( "${tags[@]}" "${REPO_NAME}:${branch}" )
-            if [ "${branch}" == "master" ]; then
-              tags=( "${tags[@]}" "${tags},${REPO_NAME}:latest" )
+            if [ "${branch}" == "master" ] && [[ -z "${gittag}" ]]; then
+              tags=( "${tags[@]}" "${REPO_NAME}:latest" )
             fi
           fi
           function join_by {
