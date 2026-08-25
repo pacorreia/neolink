@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.2-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.1-rc.3...neolink-v0.7.2-rc.3) (2026-08-25)
+
+
+### Bug Fixes
+
+* quote secret variable and guard docker push when tags are empty ([5fccc21](https://github.com/pacorreia/neolink/commit/5fccc21a4d558beb8bf043fa14c2ef2f60d3cbe7))
+* quote secret variable and guard docker push when tags are empty ([0dc7d91](https://github.com/pacorreia/neolink/commit/0dc7d91b60ff337d9a0af38c9f96815e3982f161))
+
 ## [0.7.1-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.0-rc.3...neolink-v0.7.1-rc.3) (2026-08-25)
 
 
