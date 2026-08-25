@@ -246,16 +246,16 @@ jobs:
         shell: bash
         run: |
           tags=( )
-          gittag="$(git tag --points-at HEAD)"
-          branch="$(git rev-parse --abbrev-ref HEAD)"
+          ref="${GITHUB_REF}"
+          ref_name="${GITHUB_REF_NAME}"
 
-          if [[ -n "${gittag}" ]]; then
+          if [[ "${ref}" == refs/tags/* ]]; then
+            gittag="${ref_name}"
             tags=( "${tags[@]}" "${REPO_NAME}:${gittag}" "${REPO_NAME}:latest" )
-          fi
-          if [[ -n "${branch}" ]]; then
-            branch="$(echo "${branch}" | sed -E 's|[/]|-|g')"
+          elif [[ "${ref}" == refs/heads/* ]]; then
+            branch="$(echo "${ref_name}" | sed -E 's|[/]|-|g')"
             tags=( "${tags[@]}" "${REPO_NAME}:${branch}" )
-            if [ "${branch}" == "master" ] && [[ -z "${gittag}" ]]; then
+            if [ "${branch}" == "master" ]; then
               tags=( "${tags[@]}" "${REPO_NAME}:latest" )
             fi
           fi
