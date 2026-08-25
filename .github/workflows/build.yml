@@ -258,6 +258,9 @@ jobs:
             if [ "${branch}" == "master" ]; then
               tags=( "${tags[@]}" "${REPO_NAME}:latest" )
             fi
+          elif [[ "${ref}" == refs/pull/* ]]; then
+            pr_number="$(echo "${ref}" | sed -E 's|refs/pull/([0-9]+)/.*|\1|')"
+            tags=( "${tags[@]}" "${REPO_NAME}:pr-${pr_number}" )
           fi
           function join_by {
             local d=${1-} f=${2-}
