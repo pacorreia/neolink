@@ -4,6 +4,8 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  release:
+    types: [published]
 
 env:
   rust_version: "stable"
@@ -248,13 +250,13 @@ jobs:
           branch="$(git rev-parse --abbrev-ref HEAD)"
 
           if [[ -n "${gittag}" ]]; then
-            tags=( "${tags[@]}" "${REPO_NAME}:${gittag}" )
+            tags=( "${tags[@]}" "${REPO_NAME}:${gittag}" "${REPO_NAME}:latest" )
           fi
           if [[ -n "${branch}" ]]; then
             branch="$(echo "${branch}" | sed -E 's|[/]|-|g')"
             tags=( "${tags[@]}" "${REPO_NAME}:${branch}" )
-            if [ "${branch}" == "master" ]; then
-              tags=( "${tags[@]}" "${tags},${REPO_NAME}:latest" )
+            if [ "${branch}" == "master" ] && [[ -z "${gittag}" ]]; then
+              tags=( "${tags[@]}" "${REPO_NAME}:latest" )
             fi
           fi
           function join_by {
@@ -321,7 +323,7 @@ jobs:
   create_release:
     name: Create Release
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' # Ensure this only runs on a tag or expect issues
+    if: (startsWith(github.ref, 'refs/tags/') && github.event_name == 'push') || github.event_name == 'release' # Ensure this only runs on a tag or release
     needs:
       - "cross"
       - "native"
