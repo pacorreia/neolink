@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.9-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.8-rc.3...neolink-v0.7.9-rc.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* disable push notifications by default; suppress benign GStreamer gst_poll assertion ([d6d0ec0](https://github.com/pacorreia/neolink/commit/d6d0ec0156c29dc059e28165b6661cd5b35bc4f3))
+* disable push notifications by default; suppress benign GStreamer gst_poll assertion ([364bc4d](https://github.com/pacorreia/neolink/commit/364bc4def25562dd8f84a0e138c4b45e4710b9ea))
+
 ## [0.7.8-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.7-rc.3...neolink-v0.7.8-rc.3) (2026-08-26)
 
 
