@@ -40,7 +40,7 @@ RUN  echo "TARGETPLATFORM: ${TARGETPLATFORM}"; \
           libgstreamer1.0-dev \
           libgtk2.0-dev \
           protobuf-compiler \
-          libglib2.0-dev && \
+          libglib2.0-dev \
           jq && \
         apt-get clean -y && rm -rf /var/lib/apt/lists/* ; \
     cargo build --release; \
@@ -73,7 +73,7 @@ RUN apt-get update && \
         gstreamer1.0-plugins-base \
         gstreamer1.0-plugins-good \
         gstreamer1.0-plugins-bad \
-        gstreamer1.0-libav && \
+        gstreamer1.0-libav \
         jq && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
