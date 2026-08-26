@@ -433,10 +433,10 @@ fn send_to_appsrc(
             Ok(())
         }
         Err(FlowError::Eos) => {
-            // Pipeline has reached EOS (client disconnected); the per-client
-            // thread will exit normally on the next iteration.
-            log::debug!("Pipeline EOS on {}, dropping frame", appsrc.name());
-            Ok(())
+            // Pipeline has reached EOS (client disconnected). Propagate the
+            // error so the per-client thread exits and the pipeline can fully
+            // tear down before the next client connects.
+            Err(anyhow!("Pipeline EOS on {}", appsrc.name()))
         }
         Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
     }
