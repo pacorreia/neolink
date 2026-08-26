@@ -396,7 +396,16 @@ fn send_to_appsrc(
 
         // Get a buffer from the pool and then copy in the data
         let gst_buf = {
-            let mut new_buf = pool.acquire_buffer(None).unwrap();
+            let mut new_buf = match pool.acquire_buffer(None) {
+                Ok(buf) => buf,
+                Err(_) => {
+                    // Pool is exhausted (all max buffers are in flight). Drop this
+                    // frame rather than panicking; GStreamer will release buffers
+                    // back to the pool once downstream consumes them.
+                    log::debug!("Buffer pool exhausted on {}, dropping frame", appsrc.name());
+                    return Ok(());
+                }
+            };
             let gst_buf_mut = new_buf.get_mut().unwrap();
             let time = ClockTime::from_useconds(ts.as_micros() as u64);
             gst_buf_mut.set_dts(time);
@@ -415,8 +424,14 @@ fn send_to_appsrc(
     match appsrc.push_buffer(buf) {
         Ok(_) => Ok(()),
         Err(FlowError::Flushing) => {
-            // Buffer is full, skip this frame; the live-source path already handles drops
+            // Pipeline is flushing (seek or shutdown); drop the frame silently.
             log::debug!("Buffer full on {} dropping frame", appsrc.name());
+            Ok(())
+        }
+        Err(FlowError::WrongState) => {
+            // Pipeline is transitioning state (e.g. READY→PLAYING or PLAYING→NULL);
+            // drop this frame silently rather than killing the data thread.
+            log::debug!("Wrong state on {}, dropping frame", appsrc.name());
             Ok(())
         }
         Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
