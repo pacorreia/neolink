@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.12-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.11-rc.3...neolink-v0.7.12-rc.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* propagate FlowError::Eos so pipeline tears down cleanly on client disconnect ([b0c474f](https://github.com/pacorreia/neolink/commit/b0c474fc0ffe1754c0b9428e20336095d50cc2ec))
+
 ## [0.7.11-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.10-rc.3...neolink-v0.7.11-rc.3) (2026-08-26)
 
 
