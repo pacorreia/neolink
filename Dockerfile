@@ -74,7 +74,7 @@ RUN apt-get update && \
         gstreamer1.0-plugins-good \
         gstreamer1.0-plugins-bad \
         gstreamer1.0-libav && \
-        jq &&\
+        jq && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build \
