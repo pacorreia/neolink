@@ -398,11 +398,11 @@ fn send_to_appsrc(
         let gst_buf = {
             let mut new_buf = match pool.acquire_buffer(None) {
                 Ok(buf) => buf,
-                Err(_) => {
+                Err(e) => {
                     // Pool is exhausted (all max buffers are in flight). Drop this
                     // frame rather than panicking; GStreamer will release buffers
                     // back to the pool once downstream consumes them.
-                    log::debug!("Buffer pool exhausted on {}, dropping frame", appsrc.name());
+                    log::debug!("Buffer pool acquire failed on {}: {:?}, dropping frame", appsrc.name(), e);
                     return Ok(());
                 }
             };
@@ -425,7 +425,7 @@ fn send_to_appsrc(
         Ok(_) => Ok(()),
         Err(FlowError::Flushing) => {
             // Pipeline is flushing (seek or shutdown); drop the frame silently.
-            log::debug!("Buffer full on {} dropping frame", appsrc.name());
+            log::debug!("Pipeline flushing on {}, dropping frame", appsrc.name());
             Ok(())
         }
         Err(FlowError::WrongState) => {
