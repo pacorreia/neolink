@@ -345,7 +345,7 @@ fn send_to_sources(
                 send_to_appsrc(vid_src, data, Duration::from_micros(*vid_ts as u64), pools)?;
             }
             const MICROSECONDS: u32 = 1000000;
-            *vid_ts += MICROSECONDS / stream_config.fps;
+            *vid_ts += MICROSECONDS / stream_config.fps.max(1);
         }
         _ => {}
     }
@@ -426,12 +426,6 @@ fn send_to_appsrc(
         Err(FlowError::Flushing) => {
             // Pipeline is flushing (seek or shutdown); drop the frame silently.
             log::debug!("Pipeline flushing on {}, dropping frame", appsrc.name());
-            Ok(())
-        }
-        Err(FlowError::WrongState) => {
-            // Pipeline is transitioning state (e.g. READY→PLAYING or PLAYING→NULL);
-            // drop this frame silently rather than killing the data thread.
-            log::debug!("Wrong state on {}, dropping frame", appsrc.name());
             Ok(())
         }
         Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
