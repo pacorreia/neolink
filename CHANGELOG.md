@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.11-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.10-rc.3...neolink-v0.7.11-rc.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* handle FlowError::Eos silently and broaden gst_poll assertion suppression ([18d1be4](https://github.com/pacorreia/neolink/commit/18d1be48c4b2386ea1e51d781d0d9edd76b109f0))
+* handle FlowError::Eos silently and broaden gst_poll assertion suppression ([5131ee8](https://github.com/pacorreia/neolink/commit/5131ee81c0efdfe13517824ffb299335b1c56b21))
+* suppress gst_poll_read_control CRITICAL assertion on pipeline teardown ([35d7ece](https://github.com/pacorreia/neolink/commit/35d7eceeb8b1a0a1fcd44a76bbe17aee92afd098))
+
 ## [0.7.10-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.9-rc.3...neolink-v0.7.10-rc.3) (2026-08-26)
 
 
