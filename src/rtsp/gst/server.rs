@@ -49,7 +49,10 @@ impl NeoRtspServer {
             // CRITICAL that GStreamer emits when a pipeline is torn down while an appsrc thread
             // is still running. This is a race condition in GStreamer's internals; the message
             // is non-fatal and the assertion returns safely.
-            glib::log_set_handler(
+            //
+            // In glib-rs 0.20, LogHandlerId implements Drop to call g_log_remove_handler, so
+            // we must forget it to keep the handler registered for the process lifetime.
+            let handler_id = glib::log_set_handler(
                 Some("GStreamer"),
                 glib::LogLevels::LEVEL_CRITICAL,
                 false,
@@ -60,6 +63,7 @@ impl NeoRtspServer {
                     }
                 },
             );
+            std::mem::forget(handler_id);
         });
 
         let factory = Object::new::<NeoRtspServer>();
