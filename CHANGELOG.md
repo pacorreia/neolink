@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.6-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.5-rc.3...neolink-v0.7.6-rc.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* Update Dockerfile ([b3b373b](https://github.com/pacorreia/neolink/commit/b3b373bfc67adc59c8add5a57b0ae2561f372d86))
+
 ## [0.7.5-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.4-rc.3...neolink-v0.7.5-rc.3) (2026-08-26)
 
 
