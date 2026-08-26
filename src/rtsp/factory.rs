@@ -428,7 +428,18 @@ fn send_to_appsrc(
     match appsrc.push_buffer(buf) {
         Ok(_) => Ok(()),
         Err(FlowError::Flushing) => {
-            // Pipeline is flushing (seek or shutdown); drop the frame silently.
+            // Flushing is expected during brief state transitions (e.g. PAUSED→PLAYING).
+            // However, when the pipeline has been torn down (NULL state) after a client
+            // disconnect, it will keep returning Flushing indefinitely.  If the element
+            // is already in NULL state the pipeline is gone; propagate an error so the
+            // feeder thread exits and releases all AppSrc / pipeline references (and their
+            // GLib GWakeup pipes) instead of leaking them.
+            if matches!(appsrc.current_state(), gstreamer::State::Null) {
+                return Err(anyhow!(
+                    "Pipeline stopped (NULL state) on {}",
+                    appsrc.name()
+                ));
+            }
             log::debug!("Pipeline flushing on {}, dropping frame", appsrc.name());
             Ok(())
         }
