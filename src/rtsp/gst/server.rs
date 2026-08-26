@@ -19,7 +19,7 @@ use log::*;
 use std::{
     collections::{HashMap, HashSet},
     fs,
-    sync::Arc,
+    sync::{Arc, Once},
 };
 use tokio::{
     sync::RwLock,
@@ -42,6 +42,26 @@ impl Default for NeoRtspServer {
 impl NeoRtspServer {
     pub(crate) fn new() -> AnyResult<Self> {
         gstreamer::init().context("Gstreamer failed to initialise")?;
+
+        static GST_LOG_HANDLER: Once = Once::new();
+        GST_LOG_HANDLER.call_once(|| {
+            // Suppress the benign "gst_poll_write_control: assertion 'set != NULL' failed"
+            // CRITICAL that GStreamer emits when a pipeline is torn down while an appsrc thread
+            // is still running. This is a race condition in GStreamer's internals; the message
+            // is non-fatal and the assertion returns safely.
+            glib::log_set_handler(
+                Some("GStreamer"),
+                glib::LogLevels::LEVEL_CRITICAL,
+                false,
+                false,
+                |_domain, _level, message| {
+                    if !message.contains("gst_poll_write_control") {
+                        log::error!("GStreamer: {message}");
+                    }
+                },
+            );
+        });
+
         let factory = Object::new::<NeoRtspServer>();
 
         // Setup auth
