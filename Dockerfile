@@ -41,6 +41,7 @@ RUN  echo "TARGETPLATFORM: ${TARGETPLATFORM}"; \
           libgtk2.0-dev \
           protobuf-compiler \
           libglib2.0-dev && \
+          jq && \
         apt-get clean -y && rm -rf /var/lib/apt/lists/* ; \
     cargo build --release; \
   fi
