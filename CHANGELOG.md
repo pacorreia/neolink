@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.3-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.2-rc.3...neolink-v0.7.3-rc.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* use semantic version from Cargo.toml as Docker image tag instead of branch name ([f39c846](https://github.com/pacorreia/neolink/commit/f39c846d5818a44a594f87a54b7be8d4c12a5919))
+* use semantic version from Cargo.toml as Docker image tag instead of branch name ([d384822](https://github.com/pacorreia/neolink/commit/d384822366a492c7e8b6e7cf244b4af596dd9054))
+
 ## [0.7.2-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.1-rc.3...neolink-v0.7.2-rc.3) (2026-08-25)
 
 
