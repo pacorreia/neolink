@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.10-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.9-rc.3...neolink-v0.7.10-rc.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* keep GStreamer log handler alive by using std::mem::forget on LogHandlerId ([bdcf24f](https://github.com/pacorreia/neolink/commit/bdcf24fcc468a1902d3203567b72dc096bcf5696))
+* prevent immediate unregistration of GStreamer CRITICAL log handler ([d04d99e](https://github.com/pacorreia/neolink/commit/d04d99e3a29f1535343aa8f3273945df6b5a8397))
+
 ## [0.7.9-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.8-rc.3...neolink-v0.7.9-rc.3) (2026-08-26)
 
 
