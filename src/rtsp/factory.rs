@@ -272,7 +272,7 @@ pub(super) async fn make_factory(
                                     &stream_config,
                                 );
                                 if let Err(r) = &r {
-                                    log::info!("Failed to send to source: {r:?}");
+                                    log::debug!("Failed to send to source: {r:?}");
                                 }
                                 r?;
                             }
