@@ -45,11 +45,12 @@ impl NeoRtspServer {
 
         static GST_LOG_HANDLER: Once = Once::new();
         GST_LOG_HANDLER.call_once(|| {
-            // Suppress the benign "gst_poll_write_control: assertion 'set != NULL' failed" and
-            // "gst_poll_read_control: assertion 'set != NULL' failed" CRITICALs that GStreamer
-            // emits when a pipeline is torn down (e.g. a viewer closes the stream) while an
-            // appsrc thread is still running.  Both are race conditions in GStreamer's internals;
-            // the assertions return safely and the stream recovers for the next client.
+            // Suppress the family of benign "gst_poll_*: assertion 'set != NULL' failed"
+            // CRITICALs that GStreamer emits when a pipeline is torn down (e.g. a viewer closes
+            // the stream) while an appsrc or control thread is still running.  The three variants
+            // seen in practice are gst_poll_write_control, gst_poll_read_control, and
+            // gst_poll_set_flushing.  All are races in GStreamer's internals; the assertions
+            // return safely and the stream recovers for the next client.
             //
             // In glib-rs 0.20, LogHandlerId implements Drop to call g_log_remove_handler, so
             // we must forget it to keep the handler registered for the process lifetime.
@@ -59,9 +60,7 @@ impl NeoRtspServer {
                 false,
                 false,
                 |_domain, _level, message| {
-                    if !message.contains("gst_poll_write_control")
-                        && !message.contains("gst_poll_read_control")
-                    {
+                    if !message.contains("assertion 'set != NULL' failed") {
                         log::error!("GStreamer: {message}");
                     }
                 },
