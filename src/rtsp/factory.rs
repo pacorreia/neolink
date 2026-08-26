@@ -345,7 +345,7 @@ fn send_to_sources(
                 send_to_appsrc(vid_src, data, Duration::from_micros(*vid_ts as u64), pools)?;
             }
             const MICROSECONDS: u32 = 1000000;
-            *vid_ts += MICROSECONDS / stream_config.fps;
+            *vid_ts += MICROSECONDS / stream_config.fps.max(1);
         }
         _ => {}
     }
@@ -396,7 +396,16 @@ fn send_to_appsrc(
 
         // Get a buffer from the pool and then copy in the data
         let gst_buf = {
-            let mut new_buf = pool.acquire_buffer(None).unwrap();
+            let mut new_buf = match pool.acquire_buffer(None) {
+                Ok(buf) => buf,
+                Err(e) => {
+                    // Pool is exhausted (all max buffers are in flight). Drop this
+                    // frame rather than panicking; GStreamer will release buffers
+                    // back to the pool once downstream consumes them.
+                    log::debug!("Buffer pool acquire failed on {}: {:?}, dropping frame", appsrc.name(), e);
+                    return Ok(());
+                }
+            };
             let gst_buf_mut = new_buf.get_mut().unwrap();
             let time = ClockTime::from_useconds(ts.as_micros() as u64);
             gst_buf_mut.set_dts(time);
@@ -415,15 +424,27 @@ fn send_to_appsrc(
     match appsrc.push_buffer(buf) {
         Ok(_) => Ok(()),
         Err(FlowError::Flushing) => {
-            // Buffer is full, skip this frame; the live-source path already handles drops
-            log::debug!("Buffer full on {} dropping frame", appsrc.name());
+            // Pipeline is flushing (seek or shutdown); drop the frame silently.
+            log::debug!("Pipeline flushing on {}, dropping frame", appsrc.name());
             Ok(())
         }
         Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
     }
 }
 fn check_live(app: &AppSrc) -> Result<()> {
-    app.bus().ok_or(anyhow!("App source is closed"))?;
+    // The bus is only available after the element has been added to a pipeline
+    // by GStreamer. This happens asynchronously (in the GLib main loop) after
+    // `create_element` returns, so we may race with pipeline setup here.
+    // Retry briefly before declaring the appsrc permanently closed.
+    if app.bus().is_none() {
+        for _ in 0..50 {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            if app.bus().is_some() {
+                break;
+            }
+        }
+        app.bus().ok_or(anyhow!("App source is closed"))?;
+    }
     app.pads()
         .iter()
         .all(|pad| pad.is_linked())
@@ -500,7 +521,7 @@ fn pipe_h264(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
 
     source.set_is_live(true);
     source.set_block(false);
-    source.set_min_latency(1000 / (stream_config.fps as i64));
+    source.set_min_latency(1000 / (stream_config.fps.max(1) as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
     source.set_do_timestamp(true);
@@ -552,7 +573,7 @@ fn pipe_h265(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
     source.set_is_live(true);
     source.set_block(false);
-    source.set_min_latency(1000 / (stream_config.fps as i64));
+    source.set_min_latency(1000 / (stream_config.fps.max(1) as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
     source.set_do_timestamp(true);
@@ -606,7 +627,7 @@ fn pipe_aac(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
 
     source.set_is_live(true);
     source.set_block(false);
-    source.set_min_latency(1000 / (stream_config.fps as i64));
+    source.set_min_latency(1000 / (stream_config.fps.max(1) as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
     source.set_do_timestamp(true);
@@ -692,7 +713,7 @@ fn pipe_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> R
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
     source.set_is_live(true);
     source.set_block(false);
-    source.set_min_latency(1000 / (stream_config.fps as i64));
+    source.set_min_latency(1000 / (stream_config.fps.max(1) as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
     source.set_do_timestamp(true);
@@ -700,7 +721,7 @@ fn pipe_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> R
 
     source.set_caps(Some(
         &Caps::builder("audio/x-adpcm")
-            .field("layout", "div")
+            .field("layout", "dvi")
             .field("block_align", block_size as i32)
             .field("channels", 1i32)
             .field("rate", 8000i32)
@@ -764,7 +785,7 @@ fn pipe_silence(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
 
     source.set_is_live(true);
     source.set_block(false);
-    source.set_min_latency(1000 / (stream_config.fps as i64));
+    source.set_min_latency(1000 / (stream_config.fps.max(1) as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
     source.set_do_timestamp(true);
