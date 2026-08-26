@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.8-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.7-rc.3...neolink-v0.7.8-rc.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* reformat long log::debug! line in factory.rs to pass rustfmt check ([baa3654](https://github.com/pacorreia/neolink/commit/baa36548fd6b57f396a2438d8eea261d6dcb14b2))
+
 ## [0.7.7-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.6-rc.3...neolink-v0.7.7-rc.3) (2026-08-26)
 
 
