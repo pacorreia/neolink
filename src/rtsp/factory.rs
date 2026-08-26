@@ -402,7 +402,11 @@ fn send_to_appsrc(
                     // Pool is exhausted (all max buffers are in flight). Drop this
                     // frame rather than panicking; GStreamer will release buffers
                     // back to the pool once downstream consumes them.
-                    log::debug!("Buffer pool acquire failed on {}: {:?}, dropping frame", appsrc.name(), e);
+                    log::debug!(
+                        "Buffer pool acquire failed on {}: {:?}, dropping frame",
+                        appsrc.name(),
+                        e
+                    );
                     return Ok(());
                 }
             };
