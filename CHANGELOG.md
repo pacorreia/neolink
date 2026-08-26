@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.7-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.6-rc.3...neolink-v0.7.7-rc.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* Address review feedback on buffer pool error logging, Flushing log message, and push_notifications default ([6b7cad3](https://github.com/pacorreia/neolink/commit/6b7cad35bfc1749be3a8f32aa408c1d78302a829))
+* Change push_notifications default to false; handle buffer pool exhaustion and WrongState ([7b5cb65](https://github.com/pacorreia/neolink/commit/7b5cb65beb460d9b9031e8288822e6c7a6965047))
+* clamp RTSP video timestamp fps divisor ([6b77410](https://github.com/pacorreia/neolink/commit/6b77410735a30532fdeaef8a0e8e629851fb9186))
+* Restore RTSP stream playback for Home Assistant ([b922399](https://github.com/pacorreia/neolink/commit/b92239939df303783376a3586291847a59084ea5))
+* Restore RTSP stream playback for Home Assistant ([aab4c2c](https://github.com/pacorreia/neolink/commit/aab4c2ced4dfd9dbc725bdb8690602d81bfdc7bc))
+
 ## [0.7.6-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.5-rc.3...neolink-v0.7.6-rc.3) (2026-08-26)
 
 
