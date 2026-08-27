@@ -244,7 +244,7 @@ pub(super) async fn make_factory(
                         // thread so we can use tokio::time::timeout inside it.
                         let rt_handle = tokio::runtime::Handle::current();
 
-                        // Run blocking code on a seperate thread
+                        // Run blocking code on a separate thread
                         // This is not an async thread
                         std::thread::spawn(move || {
                             let mut aud_ts = 0u32;
