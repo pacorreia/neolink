@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.14-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.13-rc.3...neolink-v0.7.14-rc.3) (2026-08-27)
+
+
+### Bug Fixes
+
+* prevent BcConnection Poller deadlock and clean up dead discovery handlers ([a091669](https://github.com/pacorreia/neolink/commit/a0916696f13593da14f9e9b85126bd2bd57a46a9))
+* prevent BcConnection Poller deadlock and clean up dead discovery handlers ([48064c4](https://github.com/pacorreia/neolink/commit/48064c4235c980fa52e011c62a8674ea9a478015))
+
 ## [0.7.13-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.12-rc.3...neolink-v0.7.13-rc.3) (2026-08-27)
 
 
