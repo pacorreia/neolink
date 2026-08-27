@@ -87,7 +87,7 @@ RUN gst-inspect-1.0; \
     "/usr/local/bin/neolink" --version && \
     mkdir -m 0700 /root/.config/
 
-ENV NEO_LINK_MODE="rtsp" NEO_LINK_PORT=8554
+ENV NEO_LINK_MODE="rtsp" NEO_LINK_PORT=8554 RUST_BACKTRACE=1
 
 CMD /usr/local/bin/neolink "${NEO_LINK_MODE}" --config /etc/neolink.toml
 ENTRYPOINT ["/entrypoint.sh"]

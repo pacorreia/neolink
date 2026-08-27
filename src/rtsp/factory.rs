@@ -244,9 +244,12 @@ pub(super) async fn make_factory(
                         // thread so we can use tokio::time::timeout inside it.
                         let rt_handle = tokio::runtime::Handle::current();
 
-                        // Run blocking code on a separate thread
-                        // This is not an async thread
-                        std::thread::spawn(move || {
+                        // Run blocking code on a Tokio-managed blocking thread so
+                        // that rt_handle.block_on(tokio::time::timeout(...)) has
+                        // access to the Tokio timer/reactor driver.  std::thread::spawn
+                        // produced a bare thread with no reactor, which caused the
+                        // "there is no reactor running" panic at the timeout call.
+                        tokio::task::spawn_blocking(move || {
                             let mut aud_ts = 0u32;
                             let mut vid_ts = 0u32;
                             let mut pools = Default::default();
