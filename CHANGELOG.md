@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.16-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.15-rc.3...neolink-v0.7.16-rc.3) (2026-08-27)
+
+
+### Bug Fixes
+
+* use spawn_blocking instead of std::thread::spawn to fix tokio reactor panic ([2cb69be](https://github.com/pacorreia/neolink/commit/2cb69bec42aaa9ea3b3d1b7b97dae38e8bc8de06))
+
 ## [0.7.15-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.14-rc.3...neolink-v0.7.15-rc.3) (2026-08-27)
 
 
