@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.13-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.12-rc.3...neolink-v0.7.13-rc.3) (2026-08-27)
+
+
+### Bug Fixes
+
+* exit feeder thread on NULL state and stop pipeline on disconnect to prevent FD leak ([83fdfd3](https://github.com/pacorreia/neolink/commit/83fdfd3e06db1cec601ede047868f3b04bb85ec9))
+* exit feeder thread on NULL state and stop pipeline on disconnect to prevent FD leak ([b45de4e](https://github.com/pacorreia/neolink/commit/b45de4e7958b90ab429a731b456701db5267f86e))
+
 ## [0.7.12-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.11-rc.3...neolink-v0.7.12-rc.3) (2026-08-26)
 
 
