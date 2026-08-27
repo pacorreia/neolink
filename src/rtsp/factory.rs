@@ -302,16 +302,15 @@ pub(super) async fn make_factory(
                                         // disconnect), so that AppSrc element
                                         // references — and their GLib GWakeup
                                         // pipe FDs — are released promptly.
-                                        let pipeline_dead =
-                                            [vid_src.as_ref(), aud_src.as_ref()]
-                                                .iter()
-                                                .flatten()
-                                                .any(|app| {
-                                                    matches!(
-                                                        app.current_state(),
-                                                        gstreamer::State::Null
-                                                    )
-                                                });
+                                        let pipeline_dead = [vid_src.as_ref(), aud_src.as_ref()]
+                                            .iter()
+                                            .flatten()
+                                            .any(|app| {
+                                                matches!(
+                                                    app.current_state(),
+                                                    gstreamer::State::Null
+                                                )
+                                            });
                                         if pipeline_dead {
                                             log::debug!(
                                                 "{name}::{stream}: Pipeline in NULL \
