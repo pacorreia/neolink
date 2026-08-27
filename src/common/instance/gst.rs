@@ -188,7 +188,21 @@ impl NeoInstance {
                         Box::pin(async move {
                             let mut media_stream = cam.start_video(stream, 0, strict).await?;
                             log::trace!("Camera started");
-                            while let Ok(media) = media_stream.get_data().await? {
+                            // Use select! so that if the downstream feeder thread drops
+                            // its receiver (media_rx) — e.g. after detecting a dead
+                            // GStreamer pipeline — this task exits promptly instead of
+                            // staying blocked inside get_data() waiting for frames that
+                            // the camera may no longer be sending to this subscription.
+                            // Prompt exit ensures the subscription is removed from
+                            // bcconn and the camera stop command is sent.
+                            loop {
+                                let media = tokio::select! {
+                                    _ = media_tx.closed() => break,
+                                    v = media_stream.get_data() => match v? {
+                                        Ok(media) => media,
+                                        Err(_) => break,
+                                    }
+                                };
                                 media_tx.send(media).await?;
                             }
                             AnyResult::Ok(())
