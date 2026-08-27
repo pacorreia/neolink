@@ -318,6 +318,12 @@ impl Poller {
                                                 &msg_num,
                                                 &msg_id
                                             );
+                                            // Channel is full: drop this message rather than
+                                            // blocking the Poller.  A blocked Poller cannot
+                                            // dispatch any other subscriber's messages (e.g.
+                                            // ping replies), which causes spurious camera
+                                            // disconnects and a resource-leak cascade.
+                                            let _ = sender.try_send(Ok(response));
                                         } else {
                                             trace!(
                                                 "Remaining: {} of {} message space for {} (ID: {})",
@@ -326,8 +332,8 @@ impl Poller {
                                                 &msg_num,
                                                 &msg_id
                                             );
+                                            let _ = sender.send(Ok(response)).await;
                                         }
-                                        let _ = sender.send(Ok(response)).await;
                                     } else {
                                         trace!(
                                             "Ignoring uninteresting message id {} (number: {})",

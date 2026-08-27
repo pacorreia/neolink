@@ -149,7 +149,11 @@ impl Discoverer {
                                         needs_removal = true;
                                     }
                                 } else {
-                                    for sender in thread_handlers.write().await.iter_mut() {
+                                    let mut locked_handlers = thread_handlers.write().await;
+                                    // Remove dead senders before dispatching to keep
+                                    // the Vec from growing unboundedly across reconnects.
+                                    locked_handlers.retain(|s| !s.is_closed());
+                                    for sender in locked_handlers.iter_mut() {
                                         let _ = sender.send(Ok((bcudp.clone(), addr))).await;
                                     }
                                 }
