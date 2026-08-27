@@ -1,12 +1,12 @@
 #!/bin/bash
 set -e
 
-if [ -n "${SUPERVISOR_TOKEN}" ] || [ -f "/data/options.json" ]; then
+if [ -f "/data/options.json" ]; then
     # Running inside Home Assistant Supervisor
     CONFIG_PATH=/data/options.json
 
-    MODE=$(jq --raw-output '.mode // empty' $CONFIG_PATH)
-    LOG=$(jq --raw-output '.log // empty' $CONFIG_PATH)
+    MODE=$(jq --raw-output '.mode // empty' "$CONFIG_PATH")
+    LOG=$(jq --raw-output '.log // empty' "$CONFIG_PATH")
 
     if [ -f "/homeassistant/addons/neolink.toml" ]; then
         echo "Migrating '/homeassistant/addons/neolink.toml' to '/addon_configs/a14d3924_neolink-latest/neolink.toml'"
@@ -42,19 +42,20 @@ if [ -n "${SUPERVISOR_TOKEN}" ] || [ -f "/data/options.json" ]; then
 
     case $MODE in
       rtsp)
-        neolink rtsp --config /config/neolink.toml
+        exec neolink rtsp --config /config/neolink.toml
         ;;
 
       mqtt)
-        neolink mqtt --config /config/neolink.toml
+        exec neolink mqtt --config /config/neolink.toml
         ;;
 
       dual)
-        neolink mqtt-rtsp --config /config/neolink.toml
+        exec neolink mqtt-rtsp --config /config/neolink.toml
         ;;
 
       *)
-        echo -n "Unknown mode option"
+        echo "Unknown mode option: ${MODE}" >&2
+        exit 1
         ;;
     esac
 else
