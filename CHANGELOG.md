@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.15-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.14-rc.3...neolink-v0.7.15-rc.3) (2026-08-27)
+
+
+### Bug Fixes
+
+* correct spelling of 'separate' in factory.rs comments ([d15376f](https://github.com/pacorreia/neolink/commit/d15376fbbc1e5f29a33a5c335cd7aa40c84bd894))
+* prevent GLib GWakeup FD leak when camera subscription starves ([7041f8a](https://github.com/pacorreia/neolink/commit/7041f8ad76440d4deec81bdca19906cf0d5c0166))
+* prevent GLib GWakeup FD leak when RTSP clients reconnect ([abc650d](https://github.com/pacorreia/neolink/commit/abc650d6587f0baa2fea88e236b84a2e1d931cb0))
+
 ## [0.7.14-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.13-rc.3...neolink-v0.7.14-rc.3) (2026-08-27)
 
 
