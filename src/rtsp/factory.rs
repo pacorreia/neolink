@@ -240,7 +240,11 @@ pub(super) async fn make_factory(
                         // Send the pipeline back to the factory so it can start
                         let _ = reply.send(element);
 
-                        // Run blocking code on a seperate thread
+                        // Capture the runtime handle before entering the blocking
+                        // thread so we can use tokio::time::timeout inside it.
+                        let rt_handle = tokio::runtime::Handle::current();
+
+                        // Run blocking code on a separate thread
                         // This is not an async thread
                         std::thread::spawn(move || {
                             let mut aud_ts = 0u32;
@@ -261,20 +265,61 @@ pub(super) async fn make_factory(
                             }
 
                             log::trace!("{name}::{stream}: Sending new frames");
-                            while let Some(data) = media_rx.blocking_recv() {
-                                let r = send_to_sources(
-                                    data,
-                                    &mut pools,
-                                    &vid_src,
-                                    &aud_src,
-                                    &mut vid_ts,
-                                    &mut aud_ts,
-                                    &stream_config,
-                                );
-                                if let Err(r) = &r {
-                                    log::debug!("Failed to send to source: {r:?}");
+                            // Use a timeout so we periodically check pipeline
+                            // liveness even when the camera has stopped sending
+                            // frames to this subscription (e.g. because a newer
+                            // client connected and the camera switched to a
+                            // different stream handle).  Without this the thread
+                            // blocks in recv() indefinitely while holding AppSrc
+                            // GLib GWakeup pipe FDs, preventing the GStreamer
+                            // pipeline from being freed after the RTSP client
+                            // disconnects.
+                            loop {
+                                match rt_handle.block_on(tokio::time::timeout(
+                                    std::time::Duration::from_secs(5),
+                                    media_rx.recv(),
+                                )) {
+                                    Ok(Some(data)) => {
+                                        let r = send_to_sources(
+                                            data,
+                                            &mut pools,
+                                            &vid_src,
+                                            &aud_src,
+                                            &mut vid_ts,
+                                            &mut aud_ts,
+                                            &stream_config,
+                                        );
+                                        if let Err(r) = &r {
+                                            log::debug!("Failed to send to source: {r:?}");
+                                        }
+                                        r?;
+                                    }
+                                    Ok(None) => break, // Channel closed, sender dropped
+                                    Err(_timeout) => {
+                                        // No data arrived in the timeout window.
+                                        // Exit if the GStreamer pipeline has been
+                                        // set to NULL (torn down after client
+                                        // disconnect), so that AppSrc element
+                                        // references — and their GLib GWakeup
+                                        // pipe FDs — are released promptly.
+                                        let pipeline_dead = [vid_src.as_ref(), aud_src.as_ref()]
+                                            .iter()
+                                            .flatten()
+                                            .any(|app| {
+                                                matches!(
+                                                    app.current_state(),
+                                                    gstreamer::State::Null
+                                                )
+                                            });
+                                        if pipeline_dead {
+                                            log::debug!(
+                                                "{name}::{stream}: Pipeline in NULL \
+                                                 state, stopping streaming thread"
+                                            );
+                                            break;
+                                        }
+                                    }
                                 }
-                                r?;
                             }
                             log::trace!("All media recieved");
                             AnyResult::Ok(())
