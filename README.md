@@ -112,6 +112,99 @@ using the terminal in the same folder the neolink binary is in.
 ./neolink rtsp --config=neolink.toml
 ```
 
+#### Configuration reference
+
+The tables below list every supported `neolink.toml` option currently parsed by
+Neolink.
+
+##### Top-level options
+
+| Key | Default | Allowed values / aliases | Description |
+| --- | --- | --- | --- |
+| `bind` | `"0.0.0.0"` |  | Address the RTSP server binds to. |
+| `bind_port` | `8554` | `0`-`65535` | Port the RTSP server listens on. |
+| `tokio_console` | `false` |  | Enables the Tokio console config flag. |
+| `certificate` | unset |  | Path to a PEM file containing the server certificate and private key for RTSP TLS. |
+| `tls_client_auth` | `"none"` | `none`, `request`, `require` | Controls whether RTSP clients must present a TLS certificate. |
+| `[mqtt]` | disabled |  | Enables MQTT support and defines the MQTT broker connection. |
+| `[[users]]` | none |  | Optional RTSP users for authenticated stream access. |
+| `[[cameras]]` | required |  | Defines each camera served by Neolink. |
+
+##### `[mqtt]`
+
+| Key | Default | Allowed values / aliases | Description |
+| --- | --- | --- | --- |
+| `broker_addr` | required | alias: `server` | Hostname or IP address of the MQTT broker. |
+| `port` | required |  | MQTT broker port. |
+| `credentials` | unset | `["username", "password"]` | Optional MQTT username/password pair. |
+| `ca` | unset |  | Optional CA certificate path for MQTT TLS. |
+| `client_auth` | unset | `["client-cert.pem", "client-key.pem"]` | Optional MQTT client certificate/key pair. This cannot be set together with `ca`. |
+
+##### `[[users]]`
+
+| Key | Default | Allowed values / aliases | Description |
+| --- | --- | --- | --- |
+| `name` | required | alias: `username` | RTSP username. `anyone` and `anonymous` are reserved names. |
+| `pass` | unset | alias: `password` | RTSP password for this user. |
+
+##### `[[cameras]]`
+
+| Key | Default | Allowed values / aliases | Description |
+| --- | --- | --- | --- |
+| `name` | required |  | Camera name. This is also used in RTSP paths and MQTT topics. |
+| `address` | unset |  | Camera address, typically `host:9000`. |
+| `uid` | unset |  | Camera UID for discovery-based connections. At least one of `address` or `uid` must be set. |
+| `username` | required |  | Camera login username. |
+| `password` | unset | alias: `pass` | Camera login password. |
+| `stream` | `All` | `none`, `all`, `both`, `main`/`mainStream`/`mainstream`/`MainStream`, `sub`/`subStream`/`substream`/`SubStream`, `extern`/`externStream`/`externstream`/`ExternStream` | Selects which RTSP streams Neolink serves for the camera. |
+| `permitted_users` | unset |  | Limits RTSP access for this camera to the listed `[[users]]`. |
+| `channel_id` | `0` | alias: `channel`; `0`-`31` | Selects the NVR channel for multi-camera devices. |
+| `[cameras.mqtt]` | enabled with defaults |  | Per-camera MQTT feature flags and timers. |
+| `[cameras.pause]` | disabled with defaults |  | Pause behavior when there is no motion or client activity. |
+| `discovery` | `relay` | `none`, `local`, `remote`, `map`, `relay`, `cellular` | Controls which UID discovery methods are allowed. |
+| `max_encryption` | `"Aes"` | `None`, `Aes`, `BcEncrypt` (case-insensitive) | Highest encryption mode Neolink will try when connecting to the camera. |
+| `strict` | `false` |  | Fails the media stream immediately when unexpected media packets are received. |
+| `print_format` | `None` | alias: `print`; `None`, `Human`, `Xml` | Prints camera status payloads in the selected format. |
+| `update_time` | `false` | alias: `time` | Forces the camera date/time to be updated when it connects. |
+| `buffer_duration` | `3000` | aliases: `duration`, `buffer`; `1`-`15000` ms | Target media buffer duration in milliseconds. |
+| `enabled` | `true` | alias: `enable` | Enables or disables the camera entirely. |
+| `debug` | `false` | alias: `verbose` | Logs decrypted XML traffic for troubleshooting. |
+| `use_splash` | `true` | alias: `splash` | Shows a generated splash stream while the real stream is unavailable. |
+| `splash_pattern` | `snow` | alias: `pattern`; `smpte`, `snow`, `black`, `white`, `red`, `green`, `blue`, `checkers-1`, `checkers-2`, `checkers-4`, `checkers-8`, `circular`, `blink`, `smpte75`, `zone-plate`, `gamut`, `chroma-zone-plate`, `solid-color`, `ball`, `smpte100`, `bar`, `pinwheel`, `spokes`, `gradient`, `colors`, `smpte-rp-219` | GStreamer test pattern used for the splash stream. |
+| `max_discovery_retries` | `10` | aliases: `retries`, `max_retries` | Maximum UID discovery retry attempts. |
+| `push_notifications` | `false` | aliases: `push`, `push_noti` | Enables push-notification support for cameras that support it. |
+| `idle_disconnect` | `false` | aliases: `idle`, `idle_disc` | Disconnects from the camera while idle to reduce battery use. |
+
+##### `[cameras.mqtt]`
+
+| Key | Default | Allowed values / aliases | Description |
+| --- | --- | --- | --- |
+| `enable_motion` | `true` |  | Publishes motion status over MQTT. |
+| `enable_light` | `true` |  | Enables MQTT control/status handling for flood lights where supported. |
+| `enable_battery` | `true` |  | Publishes battery level updates. |
+| `battery_update` | `2000` | minimum `500` ms | Battery polling/publish interval in milliseconds. |
+| `enable_preview` | `true` |  | Publishes preview images over MQTT. |
+| `preview_update` | `2000` | minimum `500` ms | Preview publish interval in milliseconds. |
+| `enable_floodlight` | `true` |  | Publishes floodlight task status where supported. |
+| `floodlight_update` | `2000` | minimum `500` ms | Floodlight task status publish interval in milliseconds. |
+| `[cameras.mqtt.discovery]` | disabled |  | Home Assistant MQTT discovery settings for this camera. |
+
+##### `[cameras.mqtt.discovery]`
+
+| Key | Default | Allowed values / aliases | Description |
+| --- | --- | --- | --- |
+| `topic` | required |  | MQTT discovery root topic, such as `homeassistant`. |
+| `features` | required | `floodlight`/`light`, `camera`/`preview`/`Preview`, `motion`/`md`/`pir`, `led`, `ir`, `reboot`, `pt`, `battery`/`power`, `siren`/`alarm` | Home Assistant entities to publish for the camera. |
+
+##### `[cameras.pause]`
+
+| Key | Default | Allowed values / aliases | Description |
+| --- | --- | --- | --- |
+| `on_motion` | `false` |  | Pauses the stream when no motion is detected. |
+| `on_disconnect` | `false` | alias: `on_client` | Pauses the stream when there are no active RTSP clients. |
+| `motion_timeout` | `1.0` | alias: `timeout` | Delay, in seconds, before pausing after motion stops. |
+| `mode` | `"none"` | `black`, `still`, `test`, `none` | What Neolink serves while the camera is paused. |
+
 ### Discovery
 
 To connect to a camera using a UID we need to find the IP address of the camera
