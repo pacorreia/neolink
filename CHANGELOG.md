@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.16-rc.3...neolink-v0.8.0-rc.3) (2026-08-28)
+
+
+### Features
+
+* detect HA context in entrypoint.sh and branch accordingly ([25a5aa2](https://github.com/pacorreia/neolink/commit/25a5aa20d6a4b8d48e61427b8c8872c3964df063))
+* detect HA context in entrypoint.sh and branch accordingly ([c793905](https://github.com/pacorreia/neolink/commit/c7939057a0b48ae3db9f32d075eed3951ae09015))
+
+
+### Documentation
+
+* add neolink config reference ([677858f](https://github.com/pacorreia/neolink/commit/677858f87c51119a5f5e52e5b89143e4c715afd0))
+
 ## [0.7.16-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.15-rc.3...neolink-v0.7.16-rc.3) (2026-08-27)
 
 
