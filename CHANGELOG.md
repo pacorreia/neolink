@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.0-rc.3...neolink-v0.8.1-rc.3) (2026-08-29)
+
+
+### Bug Fixes
+
+* Update README.md ([0b7ac98](https://github.com/pacorreia/neolink/commit/0b7ac9811b9b902eecf589279a94d0719c408433))
+
 ## [0.8.0-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.7.16-rc.3...neolink-v0.8.0-rc.3) (2026-08-28)
 
 
