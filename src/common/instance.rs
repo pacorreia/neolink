@@ -159,6 +159,14 @@ impl NeoInstance {
                                 Ok(neolink_core::Error::TokioBcSendError) => {
                                     continue;
                                 },
+                                Ok(neolink_core::Error::BcUdpDropReciver(_))
+                                | Ok(neolink_core::Error::BcUdpDropSender)
+                                | Ok(neolink_core::Error::BcUdpTimeout) => {
+                                    // UDP-specific connection errors: wait for the camera
+                                    // to reconnect (camthread will re-establish the UDP
+                                    // session and publish a new instance via camera_watch)
+                                    continue;
+                                },
                                 Ok(neolink_core::Error::Io(e)) => {
                                     use std::io::ErrorKind::*;
                                     if let ConnectionReset | ConnectionAborted | BrokenPipe | TimedOut =  e.kind() {
