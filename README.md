@@ -707,8 +707,3 @@ v3.
 This means that if you incorporate it into a piece of software available over
 the network, you must offer that software's source code to your users.
 
-## Donations
-
-If you find this code helpful please consider supporting development.
-
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/G2G5HOYIZ)
