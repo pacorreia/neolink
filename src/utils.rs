@@ -115,7 +115,12 @@ pub(crate) async fn connect_and_login(camera_config: &CameraConfig) -> Result<Bc
         &camera_config.camera_uid,
         &camera_config.discovery,
     )
-    .unwrap();
+    .with_context(|| {
+        format!(
+            "Invalid camera configuration for {}: must supply at least an address or a uid",
+            camera_config.name
+        )
+    })?;
     info!(
         "{}: Connecting to camera at {}",
         camera_config.name, camera_addr

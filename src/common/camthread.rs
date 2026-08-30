@@ -41,13 +41,29 @@ impl NeoCamThread {
         let camera = Arc::new(connect_and_login(config).await?);
         log::trace!("  - Connected");
 
-        sleep(Duration::from_secs(2)).await; // Delay a little since some calls will error if camera is waking up
-        if let Err(e) = update_camera_time(&camera, &name, config.update_time).await {
-            log::warn!("Could not set camera time, (perhaps missing on this camera of your login in not an admin): {e:?}");
-        }
-        sleep(Duration::from_secs(2)).await; // Delay a little since some calls will error if camera is waking up
-
+        // Publish the camera immediately so consumers can start streaming.
+        // Camera time update is done in the background; some cameras reject
+        // the call while warming up, so we retry a few times with a short
+        // delay rather than blocking the stream with an unconditional sleep.
         self.camera_watch.send_replace(Arc::downgrade(&camera));
+
+        let name_for_time = name.clone();
+        let camera_for_time = camera.clone();
+        let update_time = config.update_time;
+        tokio::spawn(async move {
+            for attempt in 0..3u8 {
+                match update_camera_time(&camera_for_time, &name_for_time, update_time).await {
+                    Ok(()) => break,
+                    Err(e) if attempt < 2 => {
+                        log::debug!("{name_for_time}: Camera time update attempt {attempt} failed ({e:?}), retrying…");
+                        sleep(Duration::from_secs(2)).await;
+                    }
+                    Err(e) => {
+                        log::warn!("{name_for_time}: Could not set camera time (perhaps missing on this camera or login is not admin): {e:?}");
+                    }
+                }
+            }
+        });
 
         let cancel_check = self.cancel.clone();
         // Now we wait for a disconnect
@@ -105,8 +121,8 @@ impl NeoCamThread {
     // A watch sender is used to send the new camera
     // whenever it changes
     pub(crate) async fn run(&mut self) -> AnyResult<()> {
-        const MAX_BACKOFF: Duration = Duration::from_secs(5);
-        const MIN_BACKOFF: Duration = Duration::from_millis(50);
+        const MAX_BACKOFF: Duration = Duration::from_secs(30);
+        const MIN_BACKOFF: Duration = Duration::from_millis(500);
 
         let mut backoff = MIN_BACKOFF;
 
@@ -152,9 +168,9 @@ impl NeoCamThread {
                 // Command ran long enough to be considered a success
                 backoff = MIN_BACKOFF;
             }
-            if backoff > MAX_BACKOFF {
-                backoff = MAX_BACKOFF;
-            }
+            // Cap backoff after doubling so we never exceed MAX_BACKOFF on
+            // the very next attempt.
+            backoff = backoff.min(MAX_BACKOFF);
 
             match result {
                 Ok(()) => {
@@ -168,18 +184,26 @@ impl NeoCamThread {
                     // Check if it is non-retry
                     let e_inner = e.downcast_ref::<neolink_core::Error>();
                     match e_inner {
-                        Some(neolink_core::Error::CameraLoginFail) => {
-                            // Fatal
+                        Some(neolink_core::Error::CameraLoginFail)
+                        | Some(neolink_core::Error::AuthFailed) => {
+                            // Fatal — wrong credentials, retrying is pointless
                             log::error!("{name}: Login credentials were not accepted");
                             self.cancel.cancel();
                             return Err(e);
                         }
+                        Some(neolink_core::Error::CannotInitCamera)
+                        | Some(neolink_core::Error::AddrResolutionError) => {
+                            // Fatal — the address or UID is wrong; operator intervention needed
+                            log::error!("{name}: Cannot reach camera at the configured address/uid — check config");
+                            self.cancel.cancel();
+                            return Err(e);
+                        }
                         _ => {
-                            // Non fatal
+                            // Non-fatal: connection lost or transient error, retry with backoff
                             log::warn!("{name}: Connection Lost: {:?}", e);
                             log::info!("{name}: Attempt reconnect in {:?}", backoff);
                             sleep(backoff).await;
-                            backoff *= 2;
+                            backoff = (backoff * 2).min(MAX_BACKOFF);
                         }
                     }
                 }
