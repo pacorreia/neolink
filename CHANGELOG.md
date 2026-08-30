@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.2-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.1-rc.3...neolink-v0.8.2-rc.3) (2026-08-30)
+
+
+### Bug Fixes
+
+* improve camera connection resilience and error handling ([e75c3f1](https://github.com/pacorreia/neolink/commit/e75c3f1d62043631f3547d511becc29e854c66f2))
+* improve camera connection resilience and error handling ([398c980](https://github.com/pacorreia/neolink/commit/398c980873f7c0c1bc493a90afc08630f95b1f39))
+
 ## [0.8.1-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.0-rc.3...neolink-v0.8.1-rc.3) (2026-08-29)
 
 
