@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.3-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.2-rc.3...neolink-v0.8.3-rc.3) (2026-08-31)
+
+
+### Bug Fixes
+
+* avoid clearing bin before returning None and fix iterator invalidation in clear_bin ([a17fbab](https://github.com/pacorreia/neolink/commit/a17fbab7ea75f0fed31a07d85260490a09553909))
+* avoid clearing bin before returning None and fix iterator invalidation in clear_bin ([df4b2aa](https://github.com/pacorreia/neolink/commit/df4b2aaa2ce97a4e269cbca885c4ba74c30072e8))
+
 ## [0.8.2-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.1-rc.3...neolink-v0.8.2-rc.3) (2026-08-30)
 
 
