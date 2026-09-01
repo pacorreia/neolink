@@ -210,7 +210,7 @@ impl NeoInstance {
                                             // silently ending the stream forever while the
                                             // RTSP client is still connected.
                                             log::warn!(
-                                                "Camera media stream error: {e:?}, waiting for camera to recover"
+                                                "{stream:?}: Camera media stream error: {e:?}, waiting for camera to recover"
                                             );
                                             return Err(e.into());
                                         }
