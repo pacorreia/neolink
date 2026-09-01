@@ -532,13 +532,16 @@ fn clear_bin(bin: &Element) -> Result<()> {
         .clone()
         .dynamic_cast::<Bin>()
         .map_err(|_| anyhow!("Media source's element should be a bin"))?;
-    // Collect all child elements before removing any of them.  Calling
-    // bin.remove() inside the iterate_elements() loop modifies the bin while
-    // the GStreamer iterator is active, which can trigger
-    // GST_ITERATOR_RESYNC and cause elements to be visited twice or
-    // skipped entirely.
-    let elements: Vec<_> = bin.iterate_elements().into_iter().flatten().collect();
-    for element in elements {
+    // Remove elements one at a time while iterating.  gstreamer-rs 0.23
+    // automatically calls gst_iterator_resync() when it receives
+    // GST_ITERATOR_RESYNC, so the iterator restarts from the beginning of
+    // the (now-shorter) children list after each removal.  Collecting all
+    // elements into a Vec first and then removing them causes subtle failures
+    // because all element references are held alive simultaneously while
+    // GStreamer performs state transitions during each bin.remove() call,
+    // leading to unexpected interactions between still-referenced but
+    // already-unparented elements.
+    for element in bin.iterate_elements().into_iter().flatten() {
         bin.remove(&element)?;
     }
 
