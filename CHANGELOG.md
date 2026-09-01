@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.5-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.4-rc.3...neolink-v0.8.5-rc.3) (2026-09-01)
+
+
+### Bug Fixes
+
+* explicitly handle GStreamer iterator RESYNC/Error in clear_bin ([aa8a8d9](https://github.com/pacorreia/neolink/commit/aa8a8d980705c40269520b9eb701d3116243509c))
+* fresh-iterator clear_bin and non-blocking check_live to restore streaming ([0d1bfb9](https://github.com/pacorreia/neolink/commit/0d1bfb98dc2adff3afc89f7a6f0c251bc5498012))
+* restore streaming with fresh-iterator clear_bin and non-blocking check_live ([60f5835](https://github.com/pacorreia/neolink/commit/60f5835da92d0ea2b8c3f67775210b7ee2216125))
+
 ## [0.8.4-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.3-rc.3...neolink-v0.8.4-rc.3) (2026-09-01)
 
 
