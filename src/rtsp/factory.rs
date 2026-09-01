@@ -250,12 +250,16 @@ pub(super) async fn make_factory(
                         // thread so we can use tokio::time::timeout inside it.
                         let rt_handle = tokio::runtime::Handle::current();
 
+                        // Clone name for use in the match arms below; the original
+                        // is moved into the spawn_blocking closure.
+                        let log_name = name.clone();
+
                         // Run blocking code on a Tokio-managed blocking thread so
                         // that rt_handle.block_on(tokio::time::timeout(...)) has
                         // access to the Tokio timer/reactor driver.  std::thread::spawn
                         // produced a bare thread with no reactor, which caused the
                         // "there is no reactor running" panic at the timeout call.
-                        tokio::task::spawn_blocking(move || {
+                        match tokio::task::spawn_blocking(move || {
                             let mut aud_ts = 0u32;
                             let mut vid_ts = 0u32;
                             let mut pools = Default::default();
@@ -332,7 +336,17 @@ pub(super) async fn make_factory(
                             }
                             log::trace!("All media recieved");
                             AnyResult::Ok(())
-                        });
+                        })
+                        .await
+                        {
+                            Ok(Ok(())) => {}
+                            Ok(Err(e)) => {
+                                log::debug!("{log_name}::{stream}: Feeder thread ended: {e:?}");
+                            }
+                            Err(e) => {
+                                log::debug!("{log_name}::{stream}: Feeder thread panicked: {e:?}");
+                            }
+                        }
                         AnyResult::Ok(())
                     });
                 }
@@ -421,7 +435,7 @@ fn send_to_appsrc(
     if appsrc.is_live() {
         if let Some(time) = appsrc
             .current_clock_time()
-            .and_then(|t| appsrc.base_time().map(|bt| t - bt))
+            .and_then(|t| appsrc.base_time().and_then(|bt| if t >= bt { Some(t - bt) } else { None }))
         {
             if matches!(appsrc.current_state(), gstreamer::State::Playing) {
                 ts = Duration::from_micros(time.useconds());
