@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.7-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.6-rc.3...neolink-v0.8.7-rc.3) (2026-09-01)
+
+
+### Bug Fixes
+
+* enforce conventional commit PR titles for release-please ([db4c916](https://github.com/pacorreia/neolink/commit/db4c916d2cd0449b3a26a0fda02aced72d023413))
+
 ## [0.8.6-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.5-rc.3...neolink-v0.8.6-rc.3) (2026-09-01)
 
 
