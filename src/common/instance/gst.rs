@@ -200,7 +200,20 @@ impl NeoInstance {
                                     _ = media_tx.closed() => break,
                                     v = media_stream.get_data() => match v? {
                                         Ok(media) => media,
-                                        Err(_) => break,
+                                        Err(e) => {
+                                            // A media-level error almost always means the
+                                            // camera connection dropped (the poller injects
+                                            // the error into the video subscription).
+                                            // Propagate it so run_passive_task waits for
+                                            // the camera to reconnect and restarts the
+                                            // video stream, instead of returning Ok and
+                                            // silently ending the stream forever while the
+                                            // RTSP client is still connected.
+                                            log::warn!(
+                                                "{stream:?}: Camera media stream error: {e:?}, waiting for camera to recover"
+                                            );
+                                            return Err(e.into());
+                                        }
                                     }
                                 };
                                 media_tx.send(media).await?;
@@ -211,7 +224,11 @@ impl NeoInstance {
                     .await
             })
             .and_then(|res| async move {
-                log::debug!("Camera finished streaming: {res:?}");
+                if res.is_err() {
+                    log::warn!("Camera finished streaming: {res:?}");
+                } else {
+                    log::debug!("Camera finished streaming: {res:?}");
+                }
                 Ok(())
             }),
         );

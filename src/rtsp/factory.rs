@@ -303,7 +303,7 @@ pub(super) async fn make_factory(
                                             &stream_config,
                                         );
                                         if let Err(r) = &r {
-                                            log::debug!("Failed to send to source: {r:?}");
+                                            log::warn!("Failed to send to source: {r:?}");
                                         }
                                         r?;
                                     }
@@ -341,10 +341,10 @@ pub(super) async fn make_factory(
                         {
                             Ok(Ok(())) => {}
                             Ok(Err(e)) => {
-                                log::debug!("{log_name}::{stream}: Feeder thread ended: {e:?}");
+                                log::warn!("{log_name}::{stream}: Feeder thread ended: {e:?}");
                             }
                             Err(e) => {
-                                log::debug!("{log_name}::{stream}: Feeder thread panicked: {e:?}");
+                                log::warn!("{log_name}::{stream}: Feeder thread panicked: {e:?}");
                             }
                         }
                         AnyResult::Ok(())
@@ -379,7 +379,16 @@ fn send_to_sources(
     // Update TS
     match data {
         BcMedia::Aac(aac) => {
-            let duration = aac.duration().expect("Could not calculate AAC duration");
+            // Malformed AAC headers (bad syncword / too short) are seen from some
+            // cameras; treat them as zero-duration instead of panicking, which
+            // would silently kill the feeder thread and the client's stream.
+            let duration = aac.duration().unwrap_or_else(|| {
+                log::warn!(
+                    "Could not calculate AAC duration (frame length: {} bytes), assuming 0",
+                    aac.data.len()
+                );
+                0
+            });
             if let Some(aud_src) = aud_src.as_ref() {
                 log::debug!("Sending AAC: {:?}", Duration::from_micros(*aud_ts as u64));
                 send_to_appsrc(
@@ -392,9 +401,23 @@ fn send_to_sources(
             *aud_ts += duration;
         }
         BcMedia::Adpcm(adpcm) => {
-            let duration = adpcm
-                .duration()
-                .expect("Could not calculate ADPCM duration");
+            // Guard against frames shorter than the 4-byte ADPCM header:
+            // block_size() computes `data.len() - 4`, which underflows on such
+            // frames.  Drop them instead of letting the feeder thread die.
+            if adpcm.data.len() < 4 {
+                log::warn!(
+                    "Dropping malformed ADPCM frame (length: {} bytes, need at least 4)",
+                    adpcm.data.len()
+                );
+                return Ok(());
+            }
+            let duration = adpcm.duration().unwrap_or_else(|| {
+                log::warn!(
+                    "Could not calculate ADPCM duration (frame length: {} bytes), assuming 0",
+                    adpcm.data.len()
+                );
+                0
+            });
             if let Some(aud_src) = aud_src.as_ref() {
                 log::trace!("Sending ADPCM: {:?}", Duration::from_micros(*aud_ts as u64));
                 send_to_appsrc(
