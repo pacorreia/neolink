@@ -433,10 +433,11 @@ fn send_to_appsrc(
     // Only push buffers when in play state and have a clock
     // we also timestamp at the current time
     if appsrc.is_live() {
-        if let Some(time) = appsrc
-            .current_clock_time()
-            .and_then(|t| appsrc.base_time().and_then(|bt| if t >= bt { Some(t - bt) } else { None }))
-        {
+        if let Some(time) = appsrc.current_clock_time().and_then(|t| {
+            appsrc
+                .base_time()
+                .and_then(|bt| if t >= bt { Some(t - bt) } else { None })
+        }) {
             if matches!(appsrc.current_state(), gstreamer::State::Playing) {
                 ts = Duration::from_micros(time.useconds());
             } else {
