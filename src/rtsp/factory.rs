@@ -510,15 +510,13 @@ fn check_live(app: &AppSrc) -> Result<()> {
     // The bus is only available after the element has been added to a pipeline
     // by GStreamer. This happens asynchronously (in the GLib main loop) after
     // `create_element` returns, so we may race with pipeline setup here.
-    // Retry briefly before declaring the appsrc permanently closed.
+    // When bus is None the element is either still being set up (initialization
+    // race) or has already been torn down (pipeline teardown). In both cases
+    // return Ok() — for live AppSrc elements the pipeline-state check in
+    // send_to_appsrc will drop the frame if not in PLAYING state, and
+    // push_buffer errors (Flushing / EOS) will detect teardown.
     if app.bus().is_none() {
-        for _ in 0..50 {
-            std::thread::sleep(std::time::Duration::from_millis(10));
-            if app.bus().is_some() {
-                break;
-            }
-        }
-        app.bus().ok_or(anyhow!("App source is closed"))?;
+        return Ok(());
     }
     app.pads()
         .iter()
@@ -532,17 +530,25 @@ fn clear_bin(bin: &Element) -> Result<()> {
         .clone()
         .dynamic_cast::<Bin>()
         .map_err(|_| anyhow!("Media source's element should be a bin"))?;
-    // Remove elements one at a time while iterating.  gstreamer-rs 0.23
-    // automatically calls gst_iterator_resync() when it receives
-    // GST_ITERATOR_RESYNC, so the iterator restarts from the beginning of
-    // the (now-shorter) children list after each removal.  Collecting all
-    // elements into a Vec first and then removing them causes subtle failures
-    // because all element references are held alive simultaneously while
-    // GStreamer performs state transitions during each bin.remove() call,
-    // leading to unexpected interactions between still-referenced but
-    // already-unparented elements.
-    for element in bin.iterate_elements().into_iter().flatten() {
-        bin.remove(&element)?;
+    // Obtain a fresh iterator on every pass so that a GST_ITERATOR_RESYNC
+    // signal from the previous removal can never affect the current one.
+    // Each pass takes only the first element of the (now-shorter) list and
+    // removes it; the loop terminates when the bin is empty.  This avoids
+    // both the iterator-invalidation issue (modifying a collection during
+    // iteration) and the subtle failures caused by holding all element
+    // references alive simultaneously (as collect-first approaches do).
+    // The result is matched explicitly so that a RESYNC on a fresh iterator
+    // is retried and any genuine error is propagated instead of being
+    // silently dropped.
+    loop {
+        match bin.iterate_elements().next() {
+            Ok(Some(element)) => bin.remove(&element)?,
+            Ok(None) => break,
+            Err(gstreamer::IteratorError::Resync) => continue,
+            Err(gstreamer::IteratorError::Error) => {
+                return Err(anyhow!("Failed to iterate bin elements"))
+            }
+        }
     }
 
     Ok(())
