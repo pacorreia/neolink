@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.4-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.3-rc.3...neolink-v0.8.4-rc.3) (2026-09-01)
+
+
+### Bug Fixes
+
+* revert clear_bin to iterate-while-remove to restore streaming ([c210742](https://github.com/pacorreia/neolink/commit/c2107424a6b7ad3dd6c24209a0aabf3877fc4c73))
+* revert clear_bin to iterate-while-remove to restore streaming ([48f79f0](https://github.com/pacorreia/neolink/commit/48f79f0b59e0ad504375c710ce9a9808a43eb9a6))
+
 ## [0.8.3-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.2-rc.3...neolink-v0.8.3-rc.3) (2026-08-31)
 
 
