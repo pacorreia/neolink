@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.8-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.7-rc.3...neolink-v0.8.8-rc.3) (2026-09-01)
+
+
+### Bug Fixes
+
+* address Copilot review comments on audio frame guards and log context ([957ed94](https://github.com/pacorreia/neolink/commit/957ed945f58e0db2b52b34dc74d82a8d69a668dc))
+* elide lifetime explicitly in MqttReply::as_ref to silence warning ([6aae5de](https://github.com/pacorreia/neolink/commit/6aae5deccbc076134b7a71e364c13a2a754b8fcd))
+* recover camera stream on media errors instead of dying silently ([9cb5241](https://github.com/pacorreia/neolink/commit/9cb52418313d77fd102cab383f0d84ccef028cc7))
+* recover camera stream on media errors instead of dying silently ([99f89dc](https://github.com/pacorreia/neolink/commit/99f89dc08ad2efda528334f2fff55d7f64e72eb4))
+
 ## [0.8.7-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.6-rc.3...neolink-v0.8.7-rc.3) (2026-09-01)
 
 
