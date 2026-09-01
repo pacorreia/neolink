@@ -537,10 +537,17 @@ fn clear_bin(bin: &Element) -> Result<()> {
     // both the iterator-invalidation issue (modifying a collection during
     // iteration) and the subtle failures caused by holding all element
     // references alive simultaneously (as collect-first approaches do).
+    // The result is matched explicitly so that a RESYNC on a fresh iterator
+    // is retried and any genuine error is propagated instead of being
+    // silently dropped.
     loop {
-        match bin.iterate_elements().into_iter().flatten().next() {
-            Some(element) => bin.remove(&element)?,
-            None => break,
+        match bin.iterate_elements().next() {
+            Ok(Some(element)) => bin.remove(&element)?,
+            Ok(None) => break,
+            Err(gstreamer::IteratorError::Resync) => continue,
+            Err(gstreamer::IteratorError::Error) => {
+                return Err(anyhow!("Failed to iterate bin elements"))
+            }
         }
     }
 
