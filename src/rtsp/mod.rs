@@ -61,7 +61,7 @@ use std::sync::Arc;
 use tokio::{
     sync::watch::channel as watch,
     task::JoinSet,
-    time::{interval, Duration},
+    time::{interval, sleep, timeout, Duration},
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_stream::StreamExt;
@@ -171,15 +171,34 @@ pub(crate) async fn main(_opt: Opt, reactor: NeoReactor) -> Result<()> {
                             let name = name.clone();
                             set.spawn(async move {
                                 let camera = thread_reactor2.get(&name).await?;
-                                tokio::select!(
-                                    _ = thread_global_cancel.cancelled() => {
-                                        AnyResult::Ok(())
-                                    },
-                                    _ = local_cancel.cancelled() => {
-                                        AnyResult::Ok(())
-                                    },
-                                    v = camera_main(camera, &thread_rtsp2) => v,
-                                )
+                                // Restart camera_main on error with exponential backoff.
+                                // Without this, any transient failure (e.g. the stream-info
+                                // error that used to propagate out of camera_main) would
+                                // permanently stop streaming for this camera.  The loop
+                                // exits cleanly when global/local cancellation fires or
+                                // when camera_main returns Ok (normal shutdown, e.g. the
+                                // camera was removed from config).
+                                let mut backoff = Duration::from_secs(1);
+                                loop {
+                                    tokio::select!(
+                                        _ = thread_global_cancel.cancelled() => return AnyResult::Ok(()),
+                                        _ = local_cancel.cancelled() => return AnyResult::Ok(()),
+                                        v = camera_main(camera.clone(), &thread_rtsp2) => {
+                                            match v {
+                                                Ok(()) => return AnyResult::Ok(()),
+                                                Err(e) => {
+                                                    log::warn!("{name}: RTSP handler exited: {e:?}, restarting in {backoff:?}");
+                                                    tokio::select!(
+                                                        _ = thread_global_cancel.cancelled() => return AnyResult::Ok(()),
+                                                        _ = local_cancel.cancelled() => return AnyResult::Ok(()),
+                                                        _ = sleep(backoff) => {},
+                                                    );
+                                                    backoff = (backoff * 2).min(Duration::from_secs(30));
+                                                }
+                                            }
+                                        },
+                                    );
+                                }
                             }) ;
                         }
                     }
@@ -256,13 +275,27 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
     let later_camera = camera.clone();
     let (supported_streams_tx, supported_streams) = watch(HashSet::<StreamKind>::new());
 
+    let task_name = name.clone();
     let mut set = JoinSet::new();
     set.spawn(async move {
         let mut i = IntervalStream::new(interval(Duration::from_secs(15)));
         while i.next().await.is_some() {
-            let stream_info = later_camera
+            // Use match instead of ? so a non-retriable error from get_stream_info
+            // (e.g. CameraServiceUnavailable code != 400) does not kill this task and
+            // drop supported_streams_tx.  Dropping the sender would cause
+            // `supported_streams_*.wait_for(...)` to return RecvError in the stream
+            // arms below, which would propagate as a fatal error to camera_main and
+            // stop streaming permanently with no recovery.
+            let stream_info = match later_camera
                 .run_passive_task(|cam| Box::pin(async move { Ok(cam.get_stream_info().await?) }))
-                .await?;
+                .await
+            {
+                Ok(info) => info,
+                Err(e) => {
+                    log::warn!("{task_name}: Could not get stream info: {e:?}");
+                    continue;
+                }
+            };
 
             let new_supported_streams = stream_info
                 .stream_infos
@@ -362,7 +395,19 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
                         }
                         log::debug!("{}: Preparing at {}", name, paths.join(", "));
 
-                        supported_streams_1.wait_for(|ss| ss.contains(&StreamKind::Main)).await?;
+                        // Wait up to 30 s for the camera to report MainStream support.
+                        // If the sender is dropped (polling task error) or the timeout
+                        // expires, proceed anyway: the per-client factory builder detects
+                        // the stream type on the fly and falls back to a splash screen if
+                        // the camera does not deliver video.  Without this timeout the
+                        // stream arm would block forever when the camera uses non-standard
+                        // stream-info names or get_stream_info is unavailable, causing
+                        // stream_main to never be called and the RTSP server to serve only
+                        // the "Stream not Ready" placeholder indefinitely.
+                        let _ = timeout(
+                            Duration::from_secs(30),
+                            supported_streams_1.wait_for(|ss| ss.contains(&StreamKind::Main)),
+                        ).await;
                         stream_main(camera.clone(), StreamKind::Main, rtsp, &permitted_users, &paths).await
                     }, if active_streams.contains(&StreamKind::Main) => v,
                     v = async {
@@ -396,7 +441,11 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
                         }
                         log::debug!("{}: Preparing at {}", name, paths.join(", "));
 
-                        supported_streams_2.wait_for(|ss| ss.contains(&StreamKind::Sub)).await?;
+                        // Same timeout/fallthrough logic as for Main above.
+                        let _ = timeout(
+                            Duration::from_secs(30),
+                            supported_streams_2.wait_for(|ss| ss.contains(&StreamKind::Sub)),
+                        ).await;
 
                         stream_main(camera.clone(), StreamKind::Sub, rtsp, &permitted_users, &paths).await
                     }, if active_streams.contains(&StreamKind::Sub) => v,
@@ -430,7 +479,11 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
                         }
                         log::debug!("{}: Preparing at {}", name, paths.join(", "));
 
-                        supported_streams_3.wait_for(|ss| ss.contains(&StreamKind::Extern)).await?;
+                        // Same timeout/fallthrough logic as for Main above.
+                        let _ = timeout(
+                            Duration::from_secs(30),
+                            supported_streams_3.wait_for(|ss| ss.contains(&StreamKind::Extern)),
+                        ).await;
                         stream_main(camera.clone(), StreamKind::Extern, rtsp, &permitted_users, &paths).await
                     }, if active_streams.contains(&StreamKind::Extern) => v,
                     else => {
