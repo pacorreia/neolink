@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.6-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.5-rc.3...neolink-v0.8.6-rc.3) (2026-09-01)
+
+
+### Bug Fixes
+
+* reformat factory.rs to satisfy rustfmt check ([e43f517](https://github.com/pacorreia/neolink/commit/e43f517226573d8650ca8f69f6854289607f02aa))
+* reformat factory.rs to satisfy rustfmt check ([ad5517c](https://github.com/pacorreia/neolink/commit/ad5517c659597586d0bbc01a648bbd369420b6a8))
+
 ## [0.8.5-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.4-rc.3...neolink-v0.8.5-rc.3) (2026-09-01)
 
 
