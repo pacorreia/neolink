@@ -260,8 +260,12 @@ pub(super) async fn make_factory(
                         // produced a bare thread with no reactor, which caused the
                         // "there is no reactor running" panic at the timeout call.
                         match tokio::task::spawn_blocking(move || {
-                            let mut aud_ts = 0u32;
-                            let mut vid_ts = 0u32;
+                            // u64 microsecond counters: u32 would wrap after
+                            // ~71.5 minutes of playback, producing a backwards
+                            // PTS/DTS jump that stalls the pipeline and kills
+                            // the client's stream.
+                            let mut aud_ts = 0u64;
+                            let mut vid_ts = 0u64;
                             let mut pools = Default::default();
 
                             log::trace!("{name}::{stream}: Sending buffered frames");
@@ -384,8 +388,8 @@ fn send_to_sources(
     pools: &mut HashMap<usize, gstreamer::BufferPool>,
     vid_src: &Option<AppSrc>,
     aud_src: &Option<AppSrc>,
-    vid_ts: &mut u32,
-    aud_ts: &mut u32,
+    vid_ts: &mut u64,
+    aud_ts: &mut u64,
     stream_config: &StreamConfig,
 ) -> AnyResult<()> {
     // Update TS
@@ -402,15 +406,15 @@ fn send_to_sources(
                 0
             });
             if let Some(aud_src) = aud_src.as_ref() {
-                log::debug!("Sending AAC: {:?}", Duration::from_micros(*aud_ts as u64));
+                log::debug!("Sending AAC: {:?}", Duration::from_micros(*aud_ts));
                 send_to_appsrc(
                     aud_src,
                     aac.data,
-                    Duration::from_micros(*aud_ts as u64),
+                    Duration::from_micros(*aud_ts),
                     pools,
                 )?;
             }
-            *aud_ts += duration;
+            *aud_ts += duration as u64;
         }
         BcMedia::Adpcm(adpcm) => {
             // Guard against frames shorter than the 4-byte ADPCM header:
@@ -431,24 +435,24 @@ fn send_to_sources(
                 0
             });
             if let Some(aud_src) = aud_src.as_ref() {
-                log::trace!("Sending ADPCM: {:?}", Duration::from_micros(*aud_ts as u64));
+                log::trace!("Sending ADPCM: {:?}", Duration::from_micros(*aud_ts));
                 send_to_appsrc(
                     aud_src,
                     adpcm.data,
-                    Duration::from_micros(*aud_ts as u64),
+                    Duration::from_micros(*aud_ts),
                     pools,
                 )?;
             }
-            *aud_ts += duration;
+            *aud_ts += duration as u64;
         }
         BcMedia::Iframe(BcMediaIframe { data, .. })
         | BcMedia::Pframe(BcMediaPframe { data, .. }) => {
             if let Some(vid_src) = vid_src.as_ref() {
-                log::debug!("Sending VID: {:?}", Duration::from_micros(*vid_ts as u64));
-                send_to_appsrc(vid_src, data, Duration::from_micros(*vid_ts as u64), pools)?;
+                log::debug!("Sending VID: {:?}", Duration::from_micros(*vid_ts));
+                send_to_appsrc(vid_src, data, Duration::from_micros(*vid_ts), pools)?;
             }
             const MICROSECONDS: u32 = 1000000;
-            *vid_ts += MICROSECONDS / stream_config.fps.max(1);
+            *vid_ts += (MICROSECONDS / stream_config.fps.max(1)) as u64;
         }
         _ => {}
     }
