@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.9-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.8-rc.3...neolink-v0.8.9-rc.3) (2026-09-02)
+
+
+### Bug Fixes
+
+* restore non-live appsrc semantics so video frames are never silently dropped ([b3b9299](https://github.com/pacorreia/neolink/commit/b3b92999d10bb8ee96ffc955782e6c9dc03efe9f))
+* restore non-live appsrc semantics so video frames are never silently dropped ([dd5331b](https://github.com/pacorreia/neolink/commit/dd5331b4f8937ffefd5b741e875e0be45450301c))
+
 ## [0.8.8-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.7-rc.3...neolink-v0.8.8-rc.3) (2026-09-01)
 
 
