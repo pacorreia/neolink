@@ -287,11 +287,43 @@ pub(super) async fn make_factory(
                             // GLib GWakeup pipe FDs, preventing the GStreamer
                             // pipeline from being freed after the RTSP client
                             // disconnects.
+                            //
+                            // A NULL pipeline state is ambiguous: it is permanent
+                            // after a client disconnect (teardown), but it is also
+                            // a normal transient state while the RTSP server holds
+                            // the media suspended between DESCRIBE and PLAY
+                            // (suspend-mode Reset).  Only exit once NULL has
+                            // persisted, so we don't kill the stream before the
+                            // client even sends PLAY.
+                            const NULL_GRACE: std::time::Duration =
+                                std::time::Duration::from_secs(15);
+                            let mut null_since: Option<std::time::Instant> = None;
                             loop {
-                                match rt_handle.block_on(tokio::time::timeout(
+                                let recved = rt_handle.block_on(tokio::time::timeout(
                                     std::time::Duration::from_secs(5),
                                     media_rx.recv(),
-                                )) {
+                                ));
+                                // Check pipeline liveness on every pass (whether or
+                                // not data arrived) so a torn-down pipeline releases
+                                // its AppSrc references promptly.
+                                let pipeline_null =
+                                    [vid_src.as_ref(), aud_src.as_ref()].iter().flatten().any(
+                                        |app| matches!(app.current_state(), gstreamer::State::Null),
+                                    );
+                                if pipeline_null {
+                                    let since =
+                                        null_since.get_or_insert_with(std::time::Instant::now);
+                                    if since.elapsed() >= NULL_GRACE {
+                                        log::debug!(
+                                            "{name}::{stream}: Pipeline in NULL \
+                                             state, stopping streaming thread"
+                                        );
+                                        break;
+                                    }
+                                } else {
+                                    null_since = None;
+                                }
+                                match recved {
                                     Ok(Some(data)) => {
                                         let r = send_to_sources(
                                             data,
@@ -309,28 +341,8 @@ pub(super) async fn make_factory(
                                     }
                                     Ok(None) => break, // Channel closed, sender dropped
                                     Err(_timeout) => {
-                                        // No data arrived in the timeout window.
-                                        // Exit if the GStreamer pipeline has been
-                                        // set to NULL (torn down after client
-                                        // disconnect), so that AppSrc element
-                                        // references — and their GLib GWakeup
-                                        // pipe FDs — are released promptly.
-                                        let pipeline_dead = [vid_src.as_ref(), aud_src.as_ref()]
-                                            .iter()
-                                            .flatten()
-                                            .any(|app| {
-                                                matches!(
-                                                    app.current_state(),
-                                                    gstreamer::State::Null
-                                                )
-                                            });
-                                        if pipeline_dead {
-                                            log::debug!(
-                                                "{name}::{stream}: Pipeline in NULL \
-                                                 state, stopping streaming thread"
-                                            );
-                                            break;
-                                        }
+                                        // No data arrived in the timeout window;
+                                        // loop around and re-check liveness.
                                     }
                                 }
                             }
@@ -432,7 +444,7 @@ fn send_to_sources(
         BcMedia::Iframe(BcMediaIframe { data, .. })
         | BcMedia::Pframe(BcMediaPframe { data, .. }) => {
             if let Some(vid_src) = vid_src.as_ref() {
-                log::trace!("Sending VID: {:?}", Duration::from_micros(*vid_ts as u64));
+                log::debug!("Sending VID: {:?}", Duration::from_micros(*vid_ts as u64));
                 send_to_appsrc(vid_src, data, Duration::from_micros(*vid_ts as u64), pools)?;
             }
             const MICROSECONDS: u32 = 1000000;
@@ -520,18 +532,13 @@ fn send_to_appsrc(
     match appsrc.push_buffer(buf) {
         Ok(_) => Ok(()),
         Err(FlowError::Flushing) => {
-            // Flushing is expected during brief state transitions (e.g. PAUSED→PLAYING).
-            // However, when the pipeline has been torn down (NULL state) after a client
-            // disconnect, it will keep returning Flushing indefinitely.  If the element
-            // is already in NULL state the pipeline is gone; propagate an error so the
-            // feeder thread exits and releases all AppSrc / pipeline references (and their
-            // GLib GWakeup pipes) instead of leaking them.
-            if matches!(appsrc.current_state(), gstreamer::State::Null) {
-                return Err(anyhow!(
-                    "Pipeline stopped (NULL state) on {}",
-                    appsrc.name()
-                ));
-            }
+            // Flushing is expected while the appsrc is not started: during brief
+            // state transitions (e.g. PAUSED→PLAYING) and, importantly, while the
+            // media is suspended by the RTSP server between DESCRIBE and PLAY
+            // (suspend-mode Reset puts the pipeline in NULL state).  Drop the
+            // frame and keep the feeder alive; permanent teardown (client
+            // disconnect) is detected by the persistent-NULL check in the feeder
+            // loop instead.
             log::debug!("Pipeline flushing on {}, dropping frame", appsrc.name());
             Ok(())
         }
@@ -646,12 +653,12 @@ fn pipe_h264(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
 
-    source.set_is_live(true);
+    source.set_is_live(false);
     source.set_block(false);
     source.set_min_latency(1000 / (stream_config.fps.max(1) as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
-    source.set_do_timestamp(true);
+    source.set_do_timestamp(false);
     source.set_stream_type(AppStreamType::Stream);
 
     let source = source
@@ -698,12 +705,12 @@ fn pipe_h265(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
     let source = make_element("appsrc", "vidsrc")?
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
-    source.set_is_live(true);
+    source.set_is_live(false);
     source.set_block(false);
     source.set_min_latency(1000 / (stream_config.fps.max(1) as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
-    source.set_do_timestamp(true);
+    source.set_do_timestamp(false);
     source.set_stream_type(AppStreamType::Stream);
 
     let source = source
@@ -752,12 +759,12 @@ fn pipe_aac(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
 
-    source.set_is_live(true);
+    source.set_is_live(false);
     source.set_block(false);
     source.set_min_latency(1000 / (stream_config.fps.max(1) as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
-    source.set_do_timestamp(true);
+    source.set_do_timestamp(false);
     source.set_stream_type(AppStreamType::Stream);
 
     let source = source
@@ -838,12 +845,12 @@ fn pipe_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> R
     let source = make_element("appsrc", "audsrc")?
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
-    source.set_is_live(true);
+    source.set_is_live(false);
     source.set_block(false);
     source.set_min_latency(1000 / (stream_config.fps.max(1) as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
-    source.set_do_timestamp(true);
+    source.set_do_timestamp(false);
     source.set_stream_type(AppStreamType::Stream);
 
     source.set_caps(Some(
@@ -910,12 +917,12 @@ fn pipe_silence(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
 
-    source.set_is_live(true);
+    source.set_is_live(false);
     source.set_block(false);
     source.set_min_latency(1000 / (stream_config.fps.max(1) as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
-    source.set_do_timestamp(true);
+    source.set_do_timestamp(false);
     source.set_stream_type(AppStreamType::Stream);
 
     let source = source
@@ -1076,13 +1083,19 @@ fn make_queue(name: &str, buffer_size: u32) -> AnyResult<Element> {
     let queue = make_element("queue", &format!("queue1_{}", name))?;
     queue.set_property("max-size-bytes", buffer_size);
     queue.set_property("max-size-buffers", 0u32);
-    // No time-based limit; rely solely on max-size-bytes to avoid introducing latency
-    queue.set_property("max-size-time", 0u64);
+    queue.set_property(
+        "max-size-time",
+        std::convert::TryInto::<u64>::try_into(tokio::time::Duration::from_secs(5).as_nanos())
+            .unwrap_or(0),
+    );
     Ok(queue)
 }
 
 fn buffer_size(bitrate: u32) -> u32 {
-    // ~125ms worth of data at the configured bitrate, or 4 KB minimum
-    // bitrate is in bits/sec: divide by 8 to get bytes/sec, then by 8 for 125ms (1/8 s)
-    std::cmp::max(bitrate / 64u32, 4u32 * 1024u32)
+    // ~250ms worth of data at the configured bitrate, or 4 KB, whichever is larger.
+    // bitrate is in bits/sec: divide by 8 to get bytes/sec, then by 4 for 250ms.
+    // This must comfortably fit a whole H264/H265 keyframe (which can be several
+    // hundred KB at typical mainStream bitrates); a smaller value stalls the
+    // video branch while the audio branch keeps flowing.
+    std::cmp::max(bitrate * 2 / 8u32, 4u32 * 1024u32)
 }
