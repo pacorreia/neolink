@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.10-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.9-rc.3...neolink-v0.8.10-rc.3) (2026-09-02)
+
+
+### Bug Fixes
+
+* Share camera media stream across RTSP clients to stop VIDEO_STOP from one client killing others ([0688479](https://github.com/pacorreia/neolink/commit/06884796c17ac349549fe3a96afadc56119ed055))
+
 ## [0.8.9-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.8-rc.3...neolink-v0.8.9-rc.3) (2026-09-02)
 
 
