@@ -165,19 +165,76 @@ pub(super) async fn make_factory(
     let thread = tokio::task::spawn(async move {
         let name = camera.config().await?.borrow().name.clone();
 
+        // A single shared camera media stream fanned out to every RTSP
+        // client of this camera+stream.  Each client used to open its own
+        // camera video subscription; because all subscriptions of a stream
+        // kind share one camera-side handle, the VIDEO_STOP sent when any
+        // one client's feeder exited (e.g. a stale DESCRIBE-only pipeline
+        // hitting the NULL-grace teardown) stopped the camera stream for
+        // every other client that was still playing.  With a shared pump
+        // the camera is only stopped once the last client has gone.
+        let mut shared: Option<(
+            tokio::sync::broadcast::Sender<BcMedia>,
+            JoinHandle<AnyResult<()>>,
+        )> = None;
+
         while let Some(msg) = client_rx.recv().await {
             match msg {
                 ClientMsg::NewClient { element, reply } => {
                     log::debug!("New client for {name}::{stream}");
                     let camera = camera.clone();
                     let name = name.clone();
+
+                    // (Re)spawn the shared camera pump if it is not running
+                    let media_tx = match shared.as_ref() {
+                        Some((tx, handle)) if !handle.is_finished() => tx.clone(),
+                        _ => {
+                            let (tx, _) = tokio::sync::broadcast::channel::<BcMedia>(256);
+                            let pump_tx = tx.clone();
+                            let pump_camera = camera.clone();
+                            let pump_name = name.clone();
+                            let handle = tokio::task::spawn(async move {
+                                let mut media_rx =
+                                    pump_camera.stream_while_live(stream).await?;
+                                // How long to keep the camera streaming with no
+                                // clients attached.  This bridges the gap between
+                                // a probe connection (DESCRIBE only) and the
+                                // real playback connection without a full camera
+                                // stream stop/start cycle.
+                                const LINGER: std::time::Duration =
+                                    std::time::Duration::from_secs(5);
+                                let mut none_since: Option<std::time::Instant> = None;
+                                while let Some(media) = media_rx.recv().await {
+                                    if pump_tx.send(media).is_ok() {
+                                        none_since = None;
+                                    } else {
+                                        // No clients are listening
+                                        let since = none_since
+                                            .get_or_insert_with(std::time::Instant::now);
+                                        if since.elapsed() >= LINGER {
+                                            log::debug!(
+                                                "{pump_name}::{stream}: No clients left, \
+                                                 stopping camera stream"
+                                            );
+                                            break;
+                                        }
+                                    }
+                                }
+                                AnyResult::Ok(())
+                            });
+                            shared = Some((tx.clone(), handle));
+                            tx
+                        }
+                    };
+                    let mut media_rx = media_tx.subscribe();
+                    drop(media_tx);
+
                     tokio::task::spawn(async move {
                         clear_bin(&element)?;
                         log::trace!("{name}::{stream}: Starting camera");
 
                         // Start the camera
                         let config = camera.config().await?.borrow().clone();
-                        let mut media_rx = camera.stream_while_live(stream).await?;
 
                         log::trace!("{name}::{stream}: Learning camera stream type");
                         // Learn the camera data type
@@ -185,7 +242,24 @@ pub(super) async fn make_factory(
                         let mut frame_count = 0usize;
 
                         let mut stream_config = StreamConfig::new(&camera, stream).await?;
-                        while let Some(media) = media_rx.recv().await {
+                        loop {
+                            // Bound the wait so a camera that is not currently
+                            // producing frames (restarting, or paused with no
+                            // motion) cannot stall this client forever before
+                            // the pipeline is even built.
+                            let media = match tokio::time::timeout(
+                                std::time::Duration::from_secs(15),
+                                media_rx.recv(),
+                            )
+                            .await
+                            .map_err(|_| anyhow!("Timed out waiting for camera frames"))?
+                            {
+                                Ok(media) => media,
+                                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                                    continue
+                                }
+                                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                            };
                             stream_config.update_from_media(&media);
                             buffer.push(media);
                             if frame_count > 1
@@ -328,7 +402,7 @@ pub(super) async fn make_factory(
                                     null_since = None;
                                 }
                                 match recved {
-                                    Ok(Some(data)) => {
+                                    Ok(Ok(data)) => {
                                         let r = send_to_sources(
                                             data,
                                             &mut pools,
@@ -343,7 +417,18 @@ pub(super) async fn make_factory(
                                         }
                                         r?;
                                     }
-                                    Ok(None) => break, // Channel closed, sender dropped
+                                    Ok(Err(
+                                        tokio::sync::broadcast::error::RecvError::Lagged(n),
+                                    )) => {
+                                        // This client fell behind the shared camera
+                                        // stream; skip the missed frames and catch up.
+                                        log::debug!(
+                                            "{name}::{stream}: Client lagged, skipped {n} frames"
+                                        );
+                                    }
+                                    Ok(Err(
+                                        tokio::sync::broadcast::error::RecvError::Closed,
+                                    )) => break, // Shared camera stream ended
                                     Err(_timeout) => {
                                         // No data arrived in the timeout window;
                                         // loop around and re-check liveness.
