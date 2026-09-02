@@ -203,8 +203,27 @@ pub(super) async fn make_factory(
                                 const LINGER: std::time::Duration =
                                     std::time::Duration::from_secs(5);
                                 let mut none_since: Option<std::time::Instant> = None;
-                                while let Some(media) = media_rx.recv().await {
-                                    if pump_tx.send(media).is_ok() {
+                                loop {
+                                    // Bound the wait so we still notice that the
+                                    // last client has gone even when the camera is
+                                    // idle and not producing frames (otherwise this
+                                    // task would block in recv() forever, keeping
+                                    // the camera stream subscribed indefinitely).
+                                    let recved = tokio::time::timeout(
+                                        std::time::Duration::from_secs(1),
+                                        media_rx.recv(),
+                                    )
+                                    .await;
+                                    let media = match recved {
+                                        Ok(Some(media)) => Some(media),
+                                        Ok(None) => break, // Camera stream ended
+                                        Err(_timeout) => None,
+                                    };
+                                    let have_clients = match media {
+                                        Some(media) => pump_tx.send(media).is_ok(),
+                                        None => pump_tx.receiver_count() > 0,
+                                    };
+                                    if have_clients {
                                         none_since = None;
                                     } else {
                                         // No clients are listening
