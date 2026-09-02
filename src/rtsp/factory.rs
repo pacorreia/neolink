@@ -194,8 +194,7 @@ pub(super) async fn make_factory(
                             let pump_camera = camera.clone();
                             let pump_name = name.clone();
                             let handle = tokio::task::spawn(async move {
-                                let mut media_rx =
-                                    pump_camera.stream_while_live(stream).await?;
+                                let mut media_rx = pump_camera.stream_while_live(stream).await?;
                                 // How long to keep the camera streaming with no
                                 // clients attached.  This bridges the gap between
                                 // a probe connection (DESCRIBE only) and the
@@ -209,8 +208,8 @@ pub(super) async fn make_factory(
                                         none_since = None;
                                     } else {
                                         // No clients are listening
-                                        let since = none_since
-                                            .get_or_insert_with(std::time::Instant::now);
+                                        let since =
+                                            none_since.get_or_insert_with(std::time::Instant::now);
                                         if since.elapsed() >= LINGER {
                                             log::debug!(
                                                 "{pump_name}::{stream}: No clients left, \
@@ -417,18 +416,18 @@ pub(super) async fn make_factory(
                                         }
                                         r?;
                                     }
-                                    Ok(Err(
-                                        tokio::sync::broadcast::error::RecvError::Lagged(n),
-                                    )) => {
+                                    Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(
+                                        n,
+                                    ))) => {
                                         // This client fell behind the shared camera
                                         // stream; skip the missed frames and catch up.
                                         log::debug!(
                                             "{name}::{stream}: Client lagged, skipped {n} frames"
                                         );
                                     }
-                                    Ok(Err(
-                                        tokio::sync::broadcast::error::RecvError::Closed,
-                                    )) => break, // Shared camera stream ended
+                                    Ok(Err(tokio::sync::broadcast::error::RecvError::Closed)) => {
+                                        break
+                                    } // Shared camera stream ended
                                     Err(_timeout) => {
                                         // No data arrived in the timeout window;
                                         // loop around and re-check liveness.
@@ -492,12 +491,7 @@ fn send_to_sources(
             });
             if let Some(aud_src) = aud_src.as_ref() {
                 log::debug!("Sending AAC: {:?}", Duration::from_micros(*aud_ts));
-                send_to_appsrc(
-                    aud_src,
-                    aac.data,
-                    Duration::from_micros(*aud_ts),
-                    pools,
-                )?;
+                send_to_appsrc(aud_src, aac.data, Duration::from_micros(*aud_ts), pools)?;
             }
             *aud_ts += duration as u64;
         }
@@ -521,12 +515,7 @@ fn send_to_sources(
             });
             if let Some(aud_src) = aud_src.as_ref() {
                 log::trace!("Sending ADPCM: {:?}", Duration::from_micros(*aud_ts));
-                send_to_appsrc(
-                    aud_src,
-                    adpcm.data,
-                    Duration::from_micros(*aud_ts),
-                    pools,
-                )?;
+                send_to_appsrc(aud_src, adpcm.data, Duration::from_micros(*aud_ts), pools)?;
             }
             *aud_ts += duration as u64;
         }
