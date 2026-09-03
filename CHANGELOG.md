@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.11-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.10-rc.3...neolink-v0.8.11-rc.3) (2026-09-03)
+
+
+### Bug Fixes
+
+* g_object_force_floating crash by always returning a valid pipeline element ([c4a2df1](https://github.com/pacorreia/neolink/commit/c4a2df1ec742daa2484a38116fe6b09b2713cf2d))
+
 ## [0.8.10-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.9-rc.3...neolink-v0.8.10-rc.3) (2026-09-02)
 
 
