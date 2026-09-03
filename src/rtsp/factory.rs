@@ -248,76 +248,127 @@ pub(super) async fn make_factory(
                     drop(media_tx);
 
                     tokio::task::spawn(async move {
-                        clear_bin(&element)?;
-                        log::trace!("{name}::{stream}: Starting camera");
+                        // Build the pipeline inside a fallible block. `clear_bin`
+                        // strips the media's original elements (and the ghost
+                        // pads that pointed at them) up front; if anything
+                        // after that point fails and we bail out via `?`
+                        // without ever sending a reply, `create_element` ends
+                        // up returning `None` for a bin that is no longer in a
+                        // valid state. GStreamer then tries to tear down that
+                        // (still non-null) original bin and hits
+                        // `g_object_force_floating: assertion 'G_IS_OBJECT
+                        // (object)' failed`. So on any failure here we rebuild
+                        // the bin into a valid placeholder pipeline and still
+                        // send it back via `reply`.
+                        let build_result: AnyResult<(
+                            Option<AppSrc>,
+                            Option<AppSrc>,
+                            StreamConfig,
+                            Vec<BcMedia>,
+                        )> = async {
+                            clear_bin(&element)?;
+                            log::trace!("{name}::{stream}: Starting camera");
 
-                        // Start the camera
-                        let config = camera.config().await?.borrow().clone();
+                            // Start the camera
+                            let config = camera.config().await?.borrow().clone();
 
-                        log::trace!("{name}::{stream}: Learning camera stream type");
-                        // Learn the camera data type
-                        let mut buffer = vec![];
-                        let mut frame_count = 0usize;
+                            log::trace!("{name}::{stream}: Learning camera stream type");
+                            // Learn the camera data type
+                            let mut buffer = vec![];
+                            let mut frame_count = 0usize;
 
-                        let mut stream_config = StreamConfig::new(&camera, stream).await?;
-                        loop {
-                            // Bound the wait so a camera that is not currently
-                            // producing frames (restarting, or paused with no
-                            // motion) cannot stall this client forever before
-                            // the pipeline is even built.
-                            let media = match tokio::time::timeout(
-                                std::time::Duration::from_secs(15),
-                                media_rx.recv(),
-                            )
-                            .await
-                            .map_err(|_| anyhow!("Timed out waiting for camera frames"))?
-                            {
-                                Ok(media) => media,
-                                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
-                                    continue
+                            let mut stream_config = StreamConfig::new(&camera, stream).await?;
+                            loop {
+                                // Bound the wait so a camera that is not currently
+                                // producing frames (restarting, or paused with no
+                                // motion) cannot stall this client forever before
+                                // the pipeline is even built.
+                                let media = match tokio::time::timeout(
+                                    std::time::Duration::from_secs(15),
+                                    media_rx.recv(),
+                                )
+                                .await
+                                .map_err(|_| anyhow!("Timed out waiting for camera frames"))?
+                                {
+                                    Ok(media) => media,
+                                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                                        continue
+                                    }
+                                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                                };
+                                stream_config.update_from_media(&media);
+                                buffer.push(media);
+                                if frame_count > 1
+                                    || (stream_config.vid_type.is_some()
+                                        && stream_config.aud_type.is_some())
+                                {
+                                    break;
                                 }
-                                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-                            };
-                            stream_config.update_from_media(&media);
-                            buffer.push(media);
-                            if frame_count > 1
-                                || (stream_config.vid_type.is_some()
-                                    && stream_config.aud_type.is_some())
-                            {
-                                break;
+                                frame_count += 1;
                             }
-                            frame_count += 1;
+
+                            log::trace!("{name}::{stream}: Building the pipeline");
+                            // Build the right video pipeline
+                            let vid_src = match stream_config.vid_type.as_ref() {
+                                Some(VideoType::H264) => {
+                                    let src = build_h264(&element, &stream_config)?;
+                                    AnyResult::Ok(Some(src))
+                                }
+                                Some(VideoType::H265) => {
+                                    let src = build_h265(&element, &stream_config)?;
+                                    AnyResult::Ok(Some(src))
+                                }
+                                None => {
+                                    build_unknown(&element, &config.splash_pattern.to_string())?;
+                                    AnyResult::Ok(None)
+                                }
+                            }?;
+
+                            // Build the right audio pipeline
+                            let aud_src = match stream_config.aud_type.as_ref() {
+                                Some(AudioType::Aac) => {
+                                    let src = build_aac(&element, &stream_config)?;
+                                    AnyResult::Ok(Some(src))
+                                }
+                                Some(AudioType::Adpcm(block_size)) => {
+                                    let src = build_adpcm(&element, *block_size, &stream_config)?;
+                                    AnyResult::Ok(Some(src))
+                                }
+                                None => AnyResult::Ok(None),
+                            }?;
+
+                            AnyResult::Ok((vid_src, aud_src, stream_config, buffer))
                         }
+                        .await;
 
-                        log::trace!("{name}::{stream}: Building the pipeline");
-                        // Build the right video pipeline
-                        let vid_src = match stream_config.vid_type.as_ref() {
-                            Some(VideoType::H264) => {
-                                let src = build_h264(&element, &stream_config)?;
-                                AnyResult::Ok(Some(src))
+                        let (vid_src, aud_src, stream_config, mut buffer) = match build_result {
+                            Ok(v) => v,
+                            Err(e) => {
+                                log::warn!(
+                                    "{name}::{stream}: Failed to build pipeline ({e:?}), \
+                                     falling back to a placeholder pipeline"
+                                );
+                                // `element` may already have had its original
+                                // elements (and their ghost pads) stripped by
+                                // `clear_bin` above; reset and rebuild it into
+                                // a valid placeholder so we never hand
+                                // GStreamer back a broken bin.
+                                if let Err(e2) = clear_bin(&element) {
+                                    log::warn!(
+                                        "{name}::{stream}: Could not reset bin after \
+                                         failed pipeline build: {e2:?}"
+                                    );
+                                }
+                                if let Err(e2) = build_unknown(&element, "snow") {
+                                    log::warn!(
+                                        "{name}::{stream}: Could not build placeholder \
+                                         pipeline: {e2:?}"
+                                    );
+                                }
+                                let _ = reply.send(element);
+                                return Err(e);
                             }
-                            Some(VideoType::H265) => {
-                                let src = build_h265(&element, &stream_config)?;
-                                AnyResult::Ok(Some(src))
-                            }
-                            None => {
-                                build_unknown(&element, &config.splash_pattern.to_string())?;
-                                AnyResult::Ok(None)
-                            }
-                        }?;
-
-                        // Build the right audio pipeline
-                        let aud_src = match stream_config.aud_type.as_ref() {
-                            Some(AudioType::Aac) => {
-                                let src = build_aac(&element, &stream_config)?;
-                                AnyResult::Ok(Some(src))
-                            }
-                            Some(AudioType::Adpcm(block_size)) => {
-                                let src = build_adpcm(&element, *block_size, &stream_config)?;
-                                AnyResult::Ok(Some(src))
-                            }
-                            None => AnyResult::Ok(None),
-                        }?;
+                        };
 
                         if let Some(app) = vid_src.as_ref() {
                             app.set_callbacks(
