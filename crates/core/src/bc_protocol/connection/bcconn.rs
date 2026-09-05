@@ -315,8 +315,8 @@ impl Poller {
                                                 "Remaining: {} of {} message space for {} (ID: {})",
                                                 sender.capacity(),
                                                 sender.max_capacity(),
-                                                &msg_num,
-                                                &msg_id
+                                                msg_num,
+                                                msg_id
                                             );
                                             // Channel is full: drop this message rather than
                                             // blocking the Poller.  A blocked Poller cannot
@@ -329,8 +329,8 @@ impl Poller {
                                                 "Remaining: {} of {} message space for {} (ID: {})",
                                                 sender.capacity(),
                                                 sender.max_capacity(),
-                                                &msg_num,
-                                                &msg_id
+                                                msg_num,
+                                                msg_id
                                             );
                                             let _ = sender.send(Ok(response)).await;
                                         }
