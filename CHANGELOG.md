@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.12-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.11-rc.3...neolink-v0.8.12-rc.3) (2026-09-05)
+
+
+### Bug Fixes
+
+* all pre-existing clippy warnings ([4e88b79](https://github.com/pacorreia/neolink/commit/4e88b79b325d1a6227eb6440def2e0861ad40094))
+
 ## [0.8.11-rc.3](https://github.com/pacorreia/neolink/compare/neolink-v0.8.10-rc.3...neolink-v0.8.11-rc.3) (2026-09-03)
 
 
