@@ -52,9 +52,11 @@ impl NeoRtspServer {
             // gst_poll_set_flushing.  All are races in GStreamer's internals; the assertions
             // return safely and the stream recovers for the next client.
             //
-            // In glib-rs 0.20, LogHandlerId implements Drop to call g_log_remove_handler, so
-            // we must forget it to keep the handler registered for the process lifetime.
-            let handler_id = glib::log_set_handler(
+            // `LogHandlerId` does not implement `Drop` (it's a plain handle), so the
+            // handler stays registered for the process lifetime regardless of what we
+            // do with the returned id; we only need `glib::log_remove_handler` to
+            // remove it early, which we never do here.
+            let _handler_id = glib::log_set_handler(
                 Some("GStreamer"),
                 glib::LogLevels::LEVEL_CRITICAL,
                 false,
@@ -65,7 +67,6 @@ impl NeoRtspServer {
                     }
                 },
             );
-            std::mem::forget(handler_id);
         });
 
         let factory = Object::new::<NeoRtspServer>();
