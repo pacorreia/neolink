@@ -260,12 +260,23 @@ pub(super) async fn make_factory(
                         // (object)' failed`. So on any failure here we rebuild
                         // the bin into a valid placeholder pipeline and still
                         // send it back via `reply`.
+                        // `create_element` (invoked synchronously below via
+                        // `reply`) runs on the single shared GLib main loop
+                        // thread used by *every* camera's RTSP media. If any
+                        // step here (camera config lock, subscribing to the
+                        // stream, waiting for frames) were to hang, the whole
+                        // server would stop dispatching bus messages and new
+                        // connections for all cameras, letting sockets/fds
+                        // pile up until the process runs out of file
+                        // descriptors. Bound the *entire* build with a hard
+                        // timeout so that can never happen, regardless of
+                        // which step is slow.
                         let build_result: AnyResult<(
                             Option<AppSrc>,
                             Option<AppSrc>,
                             StreamConfig,
                             Vec<BcMedia>,
-                        )> = async {
+                        )> = match tokio::time::timeout(std::time::Duration::from_secs(10), async {
                             clear_bin(&element)?;
                             log::trace!("{name}::{stream}: Starting camera");
 
@@ -282,9 +293,18 @@ pub(super) async fn make_factory(
                                 // Bound the wait so a camera that is not currently
                                 // producing frames (restarting, or paused with no
                                 // motion) cannot stall this client forever before
-                                // the pipeline is even built.
+                                // the pipeline is even built. `create_element` (the
+                                // synchronous callback that blocks on this task's
+                                // `reply`) runs on the single shared GLib main loop
+                                // thread used by *every* camera's RTSP media, so a
+                                // long wait here doesn't just stall "this client" —
+                                // it freezes bus dispatch and new-connection handling
+                                // for the whole server. Keep this short so one slow
+                                // or offline camera can't cause connections/fds to
+                                // pile up on every other camera while this thread is
+                                // blocked.
                                 let media = match tokio::time::timeout(
-                                    std::time::Duration::from_secs(15),
+                                    std::time::Duration::from_secs(5),
                                     media_rx.recv(),
                                 )
                                 .await
@@ -338,8 +358,15 @@ pub(super) async fn make_factory(
                             }?;
 
                             AnyResult::Ok((vid_src, aud_src, stream_config, buffer))
-                        }
-                        .await;
+                        })
+                        .await
+                        {
+                            Ok(result) => result,
+                            Err(_elapsed) => Err(anyhow!(
+                                "{name}::{stream}: Timed out building pipeline (>10s); \
+                                 refusing to block the shared RTSP main loop any longer"
+                            )),
+                        };
 
                         let (vid_src, aud_src, stream_config, mut buffer) = match build_result {
                             Ok(v) => v,
